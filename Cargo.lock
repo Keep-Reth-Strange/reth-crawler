@@ -2890,6 +2890,8 @@ dependencies = [
  "reth-network",
  "reth-primitives",
  "secp256k1",
+ "serde",
+ "serde_json",
  "tokio",
 ]
 
