@@ -18,12 +18,21 @@ use reth_eth_wire::{
 use reth_network::config::rng_secret_key;
 use reth_primitives::{mainnet_nodes, Chain, Hardfork, Head, NodeRecord, MAINNET, MAINNET_GENESIS};
 use secp256k1::{SecretKey, SECP256K1};
-use tokio::net::TcpStream;
+use serde::{Deserialize, Serialize};
+use tokio::{net::TcpStream, fs::OpenOptions, io::AsyncWriteExt};
 
 type AuthedP2PStream = P2PStream<ECIESStream<TcpStream>>;
 type AuthedEthStream = EthStream<P2PStream<ECIESStream<TcpStream>>>;
 
 pub static MAINNET_BOOT_NODES: Lazy<Vec<NodeRecord>> = Lazy::new(mainnet_nodes);
+
+#[derive(Serialize, Deserialize)]
+struct PeerData {
+    address: String,
+    tcp_port: u16,
+    client_version: String,
+    eth_version: u8,
+}
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
@@ -68,7 +77,22 @@ async fn main() -> eyre::Result<()> {
                     peer.address, peer.tcp_port, their_hello.client_version, their_status.version
                 );
 
-                snoop(peer, eth_stream).await;
+                // collect data into `PeerData`
+                let peer_data = PeerData {
+                    address: peer.address.to_string(),
+                    tcp_port: peer.tcp_port,
+                    client_version: their_hello.client_version.clone(),
+                    eth_version: their_status.version,
+                };
+
+                // save data into JSON file
+                match append_to_file(peer_data).await {
+                    Ok(_) => (),
+                    Err(e) => eprintln!("Error appending to file: {:?}", e),
+                }
+                
+                // TODO: right now this is useless... I comment it
+                //snoop(peer, eth_stream).await;
             }
         });
     }
@@ -147,4 +171,16 @@ async fn snoop(peer: NodeRecord, mut eth_stream: AuthedEthStream) {
             _ => {}
         }
     }
+}
+
+async fn append_to_file(peer_data: PeerData) -> eyre::Result<()> {
+    let json = serde_json::to_string(&peer_data)? + "\n";
+    let mut file = OpenOptions::new()
+        .write(true)
+        .append(true)
+        .create(true)
+        .open("peers_data.json")
+        .await?;
+    file.write_all(json.as_bytes()).await?;
+    Ok(())
 }
