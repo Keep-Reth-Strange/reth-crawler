@@ -6,6 +6,7 @@
 //! cargo run -p manual-p2p
 //! ```
 
+use chrono::Utc;
 use std::time::Duration;
 
 use futures::StreamExt;
@@ -19,7 +20,7 @@ use reth_network::config::rng_secret_key;
 use reth_primitives::{mainnet_nodes, Chain, Hardfork, Head, NodeRecord, MAINNET, MAINNET_GENESIS};
 use secp256k1::{SecretKey, SECP256K1};
 use serde::{Deserialize, Serialize};
-use tokio::{net::TcpStream, fs::OpenOptions, io::AsyncWriteExt};
+use tokio::{fs::OpenOptions, io::AsyncWriteExt, net::TcpStream};
 
 type AuthedP2PStream = P2PStream<ECIESStream<TcpStream>>;
 type AuthedEthStream = EthStream<P2PStream<ECIESStream<TcpStream>>>;
@@ -32,6 +33,7 @@ struct PeerData {
     tcp_port: u16,
     client_version: String,
     eth_version: u8,
+    last_seen: String,
 }
 
 #[tokio::main]
@@ -42,7 +44,9 @@ async fn main() -> eyre::Result<()> {
 
     // Setup discovery v4 protocol to find peers to talk to
     let mut discv4_cfg = Discv4ConfigBuilder::default();
-    discv4_cfg.add_boot_nodes(MAINNET_BOOT_NODES.clone()).lookup_interval(Duration::from_secs(1));
+    discv4_cfg
+        .add_boot_nodes(MAINNET_BOOT_NODES.clone())
+        .lookup_interval(Duration::from_secs(1));
 
     // Start discovery protocol
     let discv4 = Discv4::spawn(our_enr.udp_addr(), our_enr, our_key, discv4_cfg.build()).await?;
@@ -53,24 +57,26 @@ async fn main() -> eyre::Result<()> {
             if let DiscoveryUpdate::Added(peer) = update {
                 // Boot nodes hard at work, lets not disturb them
                 if MAINNET_BOOT_NODES.contains(&peer) {
-                    return
+                    return;
                 }
 
                 let (p2p_stream, their_hello) = match handshake_p2p(peer, our_key).await {
                     Ok(s) => s,
                     Err(e) => {
                         println!("Failed P2P handshake with peer {}, {}", peer.address, e);
-                        return
+                        return;
                     }
                 };
 
-                let (eth_stream, their_status) = match handshake_eth(p2p_stream).await {
+                let (_eth_stream, their_status) = match handshake_eth(p2p_stream).await {
                     Ok(s) => s,
                     Err(e) => {
                         println!("Failed ETH handshake with peer {}, {}", peer.address, e);
-                        return
+                        return;
                     }
                 };
+
+                let last_seen = Utc::now().to_string();
 
                 println!(
                     "Successfully connected to a peer at {}:{} ({}) using eth-wire version eth/{}",
@@ -83,6 +89,7 @@ async fn main() -> eyre::Result<()> {
                     tcp_port: peer.tcp_port,
                     client_version: their_hello.client_version.clone(),
                     eth_version: their_status.version,
+                    last_seen,
                 };
 
                 // save data into JSON file
@@ -90,7 +97,7 @@ async fn main() -> eyre::Result<()> {
                     Ok(_) => (),
                     Err(e) => eprintln!("Error appending to file: {:?}", e),
                 }
-                
+
                 // TODO: right now this is useless... I comment it
                 //snoop(peer, eth_stream).await;
             }
@@ -111,7 +118,9 @@ async fn handshake_p2p(
     let our_peer_id = pk2id(&key.public_key(SECP256K1));
     let our_hello = HelloMessage::builder(our_peer_id).build();
 
-    Ok(UnauthedP2PStream::new(ecies_stream).handshake(our_hello).await?)
+    Ok(UnauthedP2PStream::new(ecies_stream)
+        .handshake(our_hello)
+        .await?)
 }
 
 // Perform a ETH Wire handshake with a peer
@@ -127,24 +136,35 @@ async fn handshake_eth(p2p_stream: AuthedP2PStream) -> eyre::Result<(AuthedEthSt
         .forkid(Hardfork::Shanghai.fork_id(&MAINNET).unwrap())
         .build();
 
-    let status = Status { version: p2p_stream.shared_capability().version(), ..status };
+    let status = Status {
+        version: p2p_stream.shared_capability().version(),
+        ..status
+    };
     let eth_unauthed = UnauthedEthStream::new(p2p_stream);
     Ok(eth_unauthed.handshake(status, fork_filter).await?)
 }
 
 // Snoop by greedily capturing all broadcasts that the peer emits
 // note: this node cannot handle request so will be disconnected by peer when challenged
-async fn snoop(peer: NodeRecord, mut eth_stream: AuthedEthStream) {
+async fn _snoop(peer: NodeRecord, mut eth_stream: AuthedEthStream) {
     while let Some(Ok(update)) = eth_stream.next().await {
         match update {
             EthMessage::NewPooledTransactionHashes66(txs) => {
-                println!("Got {} new tx hashes from peer {}", txs.0.len(), peer.address);
+                println!(
+                    "Got {} new tx hashes from peer {}",
+                    txs.0.len(),
+                    peer.address
+                );
             }
             EthMessage::NewBlock(block) => {
                 println!("Got new block data {:?} from peer {}", block, peer.address);
             }
             EthMessage::NewPooledTransactionHashes68(txs) => {
-                println!("Got {} new tx hashes from peer {}", txs.hashes.len(), peer.address);
+                println!(
+                    "Got {} new tx hashes from peer {}",
+                    txs.hashes.len(),
+                    peer.address
+                );
             }
             EthMessage::NewBlockHashes(block_hashes) => {
                 println!(
@@ -154,19 +174,34 @@ async fn snoop(peer: NodeRecord, mut eth_stream: AuthedEthStream) {
                 );
             }
             EthMessage::GetNodeData(_) => {
-                println!("Unable to serve GetNodeData request to peer {}", peer.address);
+                println!(
+                    "Unable to serve GetNodeData request to peer {}",
+                    peer.address
+                );
             }
             EthMessage::GetReceipts(_) => {
-                println!("Unable to serve GetReceipts request to peer {}", peer.address);
+                println!(
+                    "Unable to serve GetReceipts request to peer {}",
+                    peer.address
+                );
             }
             EthMessage::GetBlockHeaders(_) => {
-                println!("Unable to serve GetBlockHeaders request to peer {}", peer.address);
+                println!(
+                    "Unable to serve GetBlockHeaders request to peer {}",
+                    peer.address
+                );
             }
             EthMessage::GetBlockBodies(_) => {
-                println!("Unable to serve GetBlockBodies request to peer {}", peer.address);
+                println!(
+                    "Unable to serve GetBlockBodies request to peer {}",
+                    peer.address
+                );
             }
             EthMessage::GetPooledTransactions(_) => {
-                println!("Unable to serve GetPooledTransactions request to peer {}", peer.address);
+                println!(
+                    "Unable to serve GetPooledTransactions request to peer {}",
+                    peer.address
+                );
             }
             _ => {}
         }
