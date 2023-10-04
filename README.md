@@ -7,9 +7,11 @@ Related to [this issue](https://github.com/paradigmxyz/reth/issues/4778).
 A sample of the peer data: 
 ```
 {
-    "address": "89.187.185.158",
-    "tcp_port": 30000,
-    "client_version": "Geth/v1.11.5-stable-ffe7aa12/linux-amd64/go1.20.4",
+    "address": "81.221.227.209",
+    "tcp_port": 11300,
+    "client_version": "Nethermind/v1.21.0+bb9b72c0/linux-x64/dotnet7.0.11",
     "eth_version": 68,
-    "last_seen": "2023-09-30 01:01:05.633752 UTC"
+    "last_seen": "2023-10-04 05:59:56.470468 UTC",
+    "country": "Switzerland",
+    "city": "Kriens"
 }
