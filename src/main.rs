@@ -22,6 +22,8 @@ use secp256k1::{SecretKey, SECP256K1};
 use serde::{Deserialize, Serialize};
 use tokio::{fs::OpenOptions, io::AsyncWriteExt, net::TcpStream};
 
+use ipgeolocate::{Locator, Service};
+
 type AuthedP2PStream = P2PStream<ECIESStream<TcpStream>>;
 type AuthedEthStream = EthStream<P2PStream<ECIESStream<TcpStream>>>;
 
@@ -34,6 +36,8 @@ struct PeerData {
     client_version: String,
     eth_version: u8,
     last_seen: String,
+    country: String,
+    city: String,
 }
 
 #[tokio::main]
@@ -83,13 +87,32 @@ async fn main() -> eyre::Result<()> {
                     peer.address, peer.tcp_port, their_hello.client_version, their_status.version
                 );
 
+                // get peer location
+                let service = Service::IpApi;
+                let ip_addr = peer.address.to_string();
+
+                let mut country = String::default();
+                let mut city = String::default();
+
+                match Locator::get(&ip_addr, service).await {
+                    Ok(loc) => {
+                        country = loc.country;
+                        city = loc.city;
+                    }
+                    Err(e) => {
+                        eprintln!("Error getting location: {:?}", e);
+                    }
+                }
+
                 // collect data into `PeerData`
                 let peer_data = PeerData {
-                    address: peer.address.to_string(),
+                    address: ip_addr,
                     tcp_port: peer.tcp_port,
                     client_version: their_hello.client_version.clone(),
                     eth_version: their_status.version,
                     last_seen,
+                    country,
+                    city,
                 };
 
                 // save data into JSON file
