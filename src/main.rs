@@ -31,6 +31,8 @@ pub static MAINNET_BOOT_NODES: Lazy<Vec<NodeRecord>> = Lazy::new(mainnet_nodes);
 
 #[derive(Serialize, Deserialize)]
 struct PeerData {
+    enode_url: String,
+    id: String,
     address: String,
     tcp_port: u16,
     client_version: String,
@@ -50,7 +52,7 @@ async fn main() -> eyre::Result<()> {
     let mut discv4_cfg = Discv4ConfigBuilder::default();
     discv4_cfg
         .add_boot_nodes(MAINNET_BOOT_NODES.clone())
-        .lookup_interval(Duration::from_secs(1));
+        .lookup_interval(Duration::from_millis(10));
 
     // Start discovery protocol
     let discv4 = Discv4::spawn(our_enr.udp_addr(), our_enr, our_key, discv4_cfg.build()).await?;
@@ -106,6 +108,8 @@ async fn main() -> eyre::Result<()> {
 
                 // collect data into `PeerData`
                 let peer_data = PeerData {
+                    enode_url: peer.to_string(),
+                    id: peer.id.to_string(),
                     address: ip_addr,
                     tcp_port: peer.tcp_port,
                     client_version: their_hello.client_version.clone(),
