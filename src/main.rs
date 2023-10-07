@@ -17,7 +17,9 @@ use reth_eth_wire::{
     EthMessage, EthStream, HelloMessage, P2PStream, Status, UnauthedEthStream, UnauthedP2PStream,
 };
 use reth_network::config::rng_secret_key;
-use reth_primitives::{mainnet_nodes, Chain, Hardfork, Head, NodeRecord, MAINNET, MAINNET_GENESIS};
+use reth_primitives::{
+    mainnet_nodes, Chain, Hardfork, Head, NodeRecord, H256, MAINNET, MAINNET_GENESIS, U256,
+};
 use secp256k1::{SecretKey, SECP256K1};
 use serde::{Deserialize, Serialize};
 use tokio::{fs::OpenOptions, io::AsyncWriteExt, net::TcpStream};
@@ -37,6 +39,11 @@ struct PeerData {
     tcp_port: u16,
     client_version: String,
     eth_version: u8,
+    capabilities: Vec<String>,
+    chain: String,
+    total_difficulty: U256,
+    best_block: H256, // TODO: convert this to a blocknum with a lookup
+    genesis_block_hash: H256,
     last_seen: String,
     country: String,
     city: String,
@@ -106,6 +113,17 @@ async fn main() -> eyre::Result<()> {
                     }
                 }
 
+                let capabilities: Vec<String> = their_hello
+                    .capabilities
+                    .iter()
+                    .map(|cap| cap.to_string())
+                    .collect();
+                let chain = their_status.chain.to_string();
+
+                let total_difficulty = their_status.total_difficulty;
+                let best_block = their_status.blockhash;
+                let genesis_block_hash = their_status.genesis;
+
                 // collect data into `PeerData`
                 let peer_data = PeerData {
                     enode_url: peer.to_string(),
@@ -114,6 +132,11 @@ async fn main() -> eyre::Result<()> {
                     tcp_port: peer.tcp_port,
                     client_version: their_hello.client_version.clone(),
                     eth_version: their_status.version,
+                    capabilities,
+                    total_difficulty,
+                    chain,
+                    best_block,
+                    genesis_block_hash,
                     last_seen,
                     country,
                     city,
