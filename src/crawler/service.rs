@@ -9,7 +9,7 @@ pub struct CrawlerService {
 
 impl CrawlerService {
     pub fn new(discv4: Discv4, key: SecretKey) -> Self {
-        let updates = UpdateListener::new(discv4.clone(), key);
+        let updates = UpdateListener::new(discv4, key);
         Self { updates }
     }
 
