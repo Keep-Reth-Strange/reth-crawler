@@ -11,6 +11,7 @@ use crawler::CrawlerFactory;
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
-    // need to join with other services eventually
+    tracing_subscriber::fmt::init();
+    // need to join with other services (apiserver, db wrapper) eventually
     CrawlerFactory::new().await.make().run().await
 }
