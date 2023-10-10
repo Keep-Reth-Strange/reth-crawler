@@ -25,10 +25,15 @@ impl UpdateListener {
     // for now consume self and start - TODO: probably needs some health-checking/restart if this completes/fails/dies
     pub async fn start(self) -> eyre::Result<()> {
         let mut discv4_stream = self.discv4.update_stream().await?;
+        let mut count = 0;
+        println!("initial self_lookup starting");
+        let initial_self_lookup = self.discv4.lookup_self().await;
+        println!("initial self-lookup: {:#?}", initial_self_lookup);
         while let Some(update) = discv4_stream.next().await {
+            // todo: this is bad and why we're building a resolver service. we shouldnt clone disc here everytime
             let captured_discv4 = self.discv4.clone();
-            tokio::spawn(async move {
-                if let DiscoveryUpdate::Added(peer) = update {
+            if let DiscoveryUpdate::Added(peer) = update {
+                tokio::spawn(async move {
                     let (p2p_stream, their_hello) = match handshake_p2p(peer, self.key).await {
                         Ok(s) => s,
                         Err(e) => {
@@ -52,18 +57,20 @@ impl UpdateListener {
                         peer.address, peer.tcp_port, their_hello.client_version, their_status.version
                     );
 
+                    let self_lookup = captured_discv4.lookup_self().await;
+                    println!("Recieved {:#?} from self_lookup", self_lookup);
+
                     // Boot nodes hard at work, lets not disturb them
                     if MAINNET_BOOT_NODES.contains(&peer) {
                         println!("last node was a bootnode: {}", peer);
-                        return;
                     }
 
                     let lookup_start = Instant::now();
                     let lookup_res = captured_discv4.lookup(peer.id).await;
                     println!(
-                        "recieved {:#?} from : {} with time taken: {:#?}",
+                        "Recieved {:#?} from : {} with time taken: {:#?}",
                         lookup_res,
-                        peer.id,
+                        peer.address,
                         lookup_start.elapsed()
                     );
 
@@ -118,8 +125,8 @@ impl UpdateListener {
                         Ok(_) => (),
                         Err(e) => eprintln!("Error appending to file: {:?}", e),
                     }
-                }
-            });
+                });
+            }
         }
         Ok(())
     }
