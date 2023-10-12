@@ -1,17 +1,9 @@
-//! Low level example of connecting to and communicating with a peer.
-//!
-//! Run with
-//!
-//! ```not_rust
-//! cargo run -p manual-p2p
-//! ```
 mod crawler;
 mod types;
 use crawler::CrawlerFactory;
 
 #[tokio::main]
-async fn main() -> eyre::Result<()> {
+async fn main() {
     tracing_subscriber::fmt::init();
-    // need to join with other services (apiserver, db wrapper) eventually
-    CrawlerFactory::new().await.make().run().await
+    let (_, _, _) = CrawlerFactory::new().await.make().await.run().await;
 }
