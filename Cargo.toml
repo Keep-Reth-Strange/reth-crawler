@@ -7,7 +7,7 @@ edition = "2021"
 # General
 once_cell = "1.17.0"
 eyre = "0.6.8"
-tokio = { version = "1.21", default-features = false }
+tokio = { version = "1.21", default-features = false, features = ["sync"] }
 futures = "0.3.26"
 chrono = "0.4.31"
 tracing = "0.1"
@@ -21,11 +21,25 @@ secp256k1 = { version = "0.27.0", default-features = false, features = [
 ] }
 
 # Reth
-reth-primitives = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.10" }
-reth-network = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.10" }
-reth-discv4 = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.10" }
-reth-eth-wire = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.10" }
-reth-ecies = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.10" }
+reth-primitives = { git = "https://github.com/paradigmxyz/reth.git", branch = "main" }
+reth-network = { git = "https://github.com/paradigmxyz/reth.git", branch = "main" }
+reth-discv4 = { git = "https://github.com/paradigmxyz/reth.git", branch = "main" }
+reth-dns-discovery = { git = "https://github.com/paradigmxyz/reth.git", branch = "main" }
+reth-eth-wire = { git = "https://github.com/paradigmxyz/reth.git", branch = "main" }
+reth-ecies = { git = "https://github.com/paradigmxyz/reth.git", branch = "main" }
+
+# aws
+aws-config = { git = "https://github.com/awslabs/aws-sdk-rust", branch = "next" }
+aws-sdk-dynamodb = { git = "https://github.com/awslabs/aws-sdk-rust", branch = "next" }
+aws-smithy-client = { git = "https://github.com/awslabs/aws-sdk-rust", branch = "next", features = [
+  "client-hyper",
+  "rustls",
+  "rt-tokio",
+] }
+aws-smithy-http = { git = "https://github.com/awslabs/aws-sdk-rust", branch = "next", features = [
+  "rt-tokio",
+] }
+aws-smithy-types = { git = "https://github.com/awslabs/aws-sdk-rust", branch = "next" }
 
 # Serialization
 serde_json = "1.0"

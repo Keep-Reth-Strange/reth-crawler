@@ -1,9 +1,10 @@
-use crate::types::PeerData;
+use crate::{crawler::db::PeerDB, types::PeerData};
 use chrono::Utc;
 use futures::StreamExt;
 use reth_discv4::{DiscoveryUpdate, Discv4};
 use secp256k1::SecretKey;
 use std::time::Instant;
+use tokio::sync::mpsc::UnboundedSender;
 
 use crate::crawler::p2p_utils::{append_to_file, handshake_eth, handshake_p2p};
 use ipgeolocate::{Locator, Service};
@@ -13,25 +14,37 @@ use reth_primitives::{mainnet_nodes, NodeRecord};
 pub static MAINNET_BOOT_NODES: Lazy<Vec<NodeRecord>> = Lazy::new(mainnet_nodes);
 
 pub struct UpdateListener {
-    discv4: Discv4, // TODO: need to make extensible for all (current/future) supported disc services
+    discv4: Discv4,
     key: SecretKey,
+    node_tx: UnboundedSender<Vec<NodeRecord>>,
+    db: PeerDB,
 }
 
 impl UpdateListener {
-    pub fn new(discv4: Discv4, key: SecretKey) -> Self {
-        UpdateListener { discv4, key }
+    pub async fn new(
+        discv4: Discv4,
+        key: SecretKey,
+        node_tx: UnboundedSender<Vec<NodeRecord>>,
+    ) -> Self {
+        let db = PeerDB::new().await;
+        UpdateListener {
+            discv4,
+            key,
+            node_tx,
+            db,
+        }
     }
 
     // for now consume self and start - TODO: probably needs some health-checking/restart if this completes/fails/dies
     pub async fn start(self) -> eyre::Result<()> {
         let mut discv4_stream = self.discv4.update_stream().await?;
-        let mut count = 0;
         println!("initial self_lookup starting");
         let initial_self_lookup = self.discv4.lookup_self().await;
         println!("initial self-lookup: {:#?}", initial_self_lookup);
         while let Some(update) = discv4_stream.next().await {
-            // todo: this is bad and why we're building a resolver service. we shouldnt clone disc here everytime
             let captured_discv4 = self.discv4.clone();
+            let node_tx = self.node_tx.clone();
+            let db: PeerDB = self.db.clone();
             if let DiscoveryUpdate::Added(peer) = update {
                 tokio::spawn(async move {
                     let (p2p_stream, their_hello) = match handshake_p2p(peer, self.key).await {
@@ -57,22 +70,44 @@ impl UpdateListener {
                         peer.address, peer.tcp_port, their_hello.client_version, their_status.version
                     );
 
-                    let self_lookup = captured_discv4.lookup_self().await;
-                    println!("Recieved {:#?} from self_lookup", self_lookup);
-
-                    // Boot nodes hard at work, lets not disturb them
+                    // we're probably already traversing a bootnode from Discv4::bootstrap(), so no need to kick another lookup
                     if MAINNET_BOOT_NODES.contains(&peer) {
                         println!("last node was a bootnode: {}", peer);
-                    }
+                    } else {
+                        let self_lookup = captured_discv4.lookup_self().await;
+                        println!("Recieved {:#?} from self_lookup", self_lookup);
+                        match self_lookup {
+                            Ok(nodes) => {
+                                println!("nodes len: {}", nodes.len());
+                                if nodes.len() > 0 {
+                                    println!("sending self lookup res to resolver");
+                                    // send to resolver
+                                    node_tx.send(nodes).unwrap();
+                                }
+                            }
+                            Err(_) => {}
+                        }
 
-                    let lookup_start = Instant::now();
-                    let lookup_res = captured_discv4.lookup(peer.id).await;
-                    println!(
-                        "Recieved {:#?} from : {} with time taken: {:#?}",
-                        lookup_res,
-                        peer.address,
-                        lookup_start.elapsed()
-                    );
+                        let lookup_start = Instant::now();
+                        let lookup_res = captured_discv4.lookup(peer.id).await;
+                        println!(
+                            "Recieved {:#?} from : {} with time taken: {:#?}",
+                            lookup_res,
+                            peer.address,
+                            lookup_start.elapsed()
+                        );
+                        match lookup_res {
+                            Ok(nodes) => {
+                                println!("nodes len: {}", nodes.len());
+                                if nodes.len() > 0 {
+                                    println!("sending to resolver");
+                                    // send to resolver
+                                    node_tx.send(nodes).unwrap();
+                                }
+                            }
+                            Err(_) => {}
+                        }
+                    }
 
                     // get peer location
                     let service = Service::IpApi;
@@ -119,12 +154,7 @@ impl UpdateListener {
                         country,
                         city,
                     };
-
-                    // save data into JSON file
-                    match append_to_file(peer_data).await {
-                        Ok(_) => (),
-                        Err(e) => eprintln!("Error appending to file: {:?}", e),
-                    }
+                    db.add_peer(peer_data).await.unwrap();
                 });
             }
         }
