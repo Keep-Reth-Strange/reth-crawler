@@ -38,9 +38,6 @@ impl UpdateListener {
     // for now consume self and start - TODO: probably needs some health-checking/restart if this completes/fails/dies
     pub async fn start(self) -> eyre::Result<()> {
         let mut discv4_stream = self.discv4.update_stream().await?;
-        println!("initial self_lookup starting");
-        let initial_self_lookup = self.discv4.lookup_self().await;
-        println!("initial self-lookup: {:#?}", initial_self_lookup);
         while let Some(update) = discv4_stream.next().await {
             let captured_discv4 = self.discv4.clone();
             let node_tx = self.node_tx.clone();

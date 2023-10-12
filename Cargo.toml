@@ -29,18 +29,8 @@ reth-eth-wire = { git = "https://github.com/paradigmxyz/reth.git", branch = "mai
 reth-ecies = { git = "https://github.com/paradigmxyz/reth.git", branch = "main" }
 
 # aws
-aws-config = { git = "https://github.com/awslabs/aws-sdk-rust", branch = "next" }
-aws-sdk-dynamodb = { git = "https://github.com/awslabs/aws-sdk-rust", branch = "next" }
-aws-smithy-client = { git = "https://github.com/awslabs/aws-sdk-rust", branch = "next", features = [
-  "client-hyper",
-  "rustls",
-  "rt-tokio",
-] }
-aws-smithy-http = { git = "https://github.com/awslabs/aws-sdk-rust", branch = "next", features = [
-  "rt-tokio",
-] }
-aws-smithy-types = { git = "https://github.com/awslabs/aws-sdk-rust", branch = "next" }
-
+aws-config = { version = "0.56.1" }
+aws-sdk-dynamodb = { version = "0.33.0" }
 # Serialization
 serde_json = "1.0"
 serde = { version = "1.0.188", features = ["derive"] }
