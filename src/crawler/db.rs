@@ -30,7 +30,7 @@ impl PeerDB {
         let client_version = AttributeValue::S(peer_data.client_version);
         let enode_url = AttributeValue::S(peer_data.enode_url);
         let port = AttributeValue::N(peer_data.tcp_port.to_string()); // numbers are sent over the network as string
-        let chain = AttributeValue::S(peer_data.chain);
+                                                                      // let chain = AttributeValue::S(peer_data.chain);
         let country = AttributeValue::S(peer_data.country);
         let city = AttributeValue::S(peer_data.city);
         let last_seen = AttributeValue::S(peer_data.last_seen);
@@ -45,7 +45,7 @@ impl PeerDB {
             .item("client_version", client_version)
             .item("enode_url", enode_url)
             .item("port", port)
-            .item("chain", chain)
+            // .item("chain", chain)
             .item("country", country)
             .item("city", city)
             .item("last_seen", last_seen)

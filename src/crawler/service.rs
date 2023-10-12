@@ -1,5 +1,6 @@
 use futures::join;
 use reth_discv4::Discv4;
+use reth_dns_discovery::DnsDiscoveryHandle;
 use reth_primitives::NodeRecord;
 use secp256k1::SecretKey;
 use tokio::sync::mpsc;
@@ -14,14 +15,18 @@ pub struct CrawlerService {
 }
 
 impl CrawlerService {
-    pub async fn new(discv4: Discv4, key: SecretKey) -> Self {
+    pub async fn new(discv4: Discv4, dnsdisc: DnsDiscoveryHandle, key: SecretKey) -> Self {
         let (tx, rx) = mpsc::unbounded_channel::<Vec<NodeRecord>>();
-        let updates = UpdateListener::new(discv4.clone(), key, tx.clone()).await;
-        let resolver = ResolverService::new(discv4, key, tx, rx).await;
+        let updates = UpdateListener::new(discv4.clone(), dnsdisc.clone(), key, tx.clone()).await;
+        let resolver = ResolverService::new(key, tx, rx).await;
         Self { updates, resolver }
     }
 
-    pub async fn run(self) -> (eyre::Result<()>, eyre::Result<()>) {
-        join!(self.updates.start(), self.resolver.start())
+    pub async fn run(self) -> (eyre::Result<()>, eyre::Result<()>, eyre::Result<()>) {
+        join!(
+            self.updates.start_discv4(),
+            self.updates.start_dnsdisc(),
+            self.resolver.start()
+        )
     }
 }

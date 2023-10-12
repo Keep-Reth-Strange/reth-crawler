@@ -5,5 +5,5 @@ use crawler::CrawlerFactory;
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt::init();
-    let (_, _) = CrawlerFactory::new().await.make().await.run().await;
+    let (_, _, _) = CrawlerFactory::new().await.make().await.run().await;
 }
