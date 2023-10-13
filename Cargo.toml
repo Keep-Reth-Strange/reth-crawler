@@ -37,3 +37,4 @@ serde = { version = "1.0.188", features = ["derive"] }
 
 # misc
 ipgeolocate = "0.3.5"
+clap = { version = "4.4.6", features = ["derive"] }

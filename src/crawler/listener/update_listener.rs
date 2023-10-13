@@ -1,4 +1,7 @@
-use crate::{crawler::db::PeerDB, types::PeerData};
+use crate::{
+    crawler::{db::PeerDB, p2p_utils::save_peer},
+    types::PeerData,
+};
 use chrono::Utc;
 use futures::StreamExt;
 use reth_discv4::{DiscoveryUpdate, Discv4};
@@ -39,7 +42,7 @@ impl UpdateListener {
         }
     }
 
-    pub async fn start_discv4(&self) -> eyre::Result<()> {
+    pub async fn start_discv4(&self, save_to_json: bool) -> eyre::Result<()> {
         let mut discv4_stream = self.discv4.update_stream().await?;
         let key = self.key;
         while let Some(update) = discv4_stream.next().await {
@@ -158,18 +161,14 @@ impl UpdateListener {
                         country,
                         city,
                     };
-                    db.add_peer(peer_data).await.unwrap(); /*
-                                                           match append_to_file(peer_data).await {
-                                                               Ok(_) => (),
-                                                               Err(e) => eprintln!("Error appending to file: {:?}", e),
-                                                           }*/
+                    save_peer(peer_data, save_to_json, db).await;
                 });
             }
         }
         Ok(())
     }
 
-    pub async fn start_dnsdisc(&self) -> eyre::Result<()> {
+    pub async fn start_dnsdisc(&self, save_to_json: bool) -> eyre::Result<()> {
         let mut dnsdisc_update_stream = self.dnsdisc.node_record_stream().await?;
         let key = self.key;
         while let Some(update) = dnsdisc_update_stream.next().await {
@@ -288,14 +287,7 @@ impl UpdateListener {
                     country,
                     city,
                 };
-                db.add_peer(peer_data).await.unwrap();
-                /*
-                // save data into JSON file
-                match append_to_file(peer_data).await {
-                    Ok(_) => (),
-                    Err(e) => eprintln!("Error appending to file: {:?}", e),
-                }
-                */
+                save_peer(peer_data, save_to_json, db).await;
             });
         }
         Ok(())

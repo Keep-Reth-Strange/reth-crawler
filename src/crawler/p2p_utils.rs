@@ -1,3 +1,5 @@
+use super::db::PeerDB;
+use crate::types::PeerData;
 use futures::StreamExt;
 use reth_ecies::{stream::ECIESStream, util::pk2id};
 use reth_eth_wire::{
@@ -9,8 +11,6 @@ use tokio::{fs::OpenOptions, io::AsyncWriteExt, net::TcpStream};
 
 type AuthedP2PStream = P2PStream<ECIESStream<TcpStream>>;
 type AuthedEthStream = EthStream<P2PStream<ECIESStream<TcpStream>>>;
-
-use crate::types::PeerData;
 
 // Perform a P2P handshake with a peer
 pub(crate) async fn handshake_p2p(
@@ -125,4 +125,16 @@ pub(crate) async fn append_to_file(peer_data: PeerData) -> eyre::Result<()> {
         .await?;
     file.write_all(json.as_bytes()).await?;
     Ok(())
+}
+
+/// Helper function to save a peer.
+pub(crate) async fn save_peer(peer_data: PeerData, save_to_json: bool, db: PeerDB) {
+    if save_to_json {
+        match append_to_file(peer_data).await {
+            Ok(_) => (),
+            Err(e) => eprintln!("Error appending to file: {:?}", e),
+        }
+    } else {
+        db.add_peer(peer_data).await.unwrap();
+    }
 }

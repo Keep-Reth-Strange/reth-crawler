@@ -1,6 +1,6 @@
 use crate::crawler::{
     db::PeerDB,
-    p2p_utils::{append_to_file, handshake_eth, handshake_p2p},
+    p2p_utils::{append_to_file, handshake_eth, handshake_p2p, save_peer},
 };
 use crate::types::PeerData;
 use chrono::Utc;
@@ -42,7 +42,7 @@ impl ResolverService {
 
     // we use this walk down a list of nodes returned by a force lookup(node/self), and attempt to handshake
     // runs the risk of duplicates, but this is an attempt to expand the reach of the crawler
-    pub async fn start(mut self) -> eyre::Result<()> {
+    pub async fn start(mut self, save_to_json: bool) -> eyre::Result<()> {
         while let Some(records) = self.node_rx.recv().await {
             let _ = records.iter().for_each(|peer| {
                 println!("attempting to handshake peer: {}", peer);
@@ -116,12 +116,7 @@ impl ResolverService {
                         last_seen,
                         //chain,
                     };
-                    //db.add_peer(peer_data).await.unwrap();
-                    // save data into JSON file
-                    match append_to_file(peer_data).await {
-                        Ok(_) => (),
-                        Err(e) => eprintln!("Error appending to file: {:?}", e),
-                    }
+                    save_peer(peer_data, save_to_json, db).await;
                 });
             });
         }
