@@ -42,7 +42,7 @@ impl ResolverService {
 
     // we use this walk down a list of nodes returned by a force lookup(node/self), and attempt to handshake
     // runs the risk of duplicates, but this is an attempt to expand the reach of the crawler
-    pub async fn start(mut self) -> eyre::Result<()> {
+    pub async fn start(mut self, save_to_json: bool) -> eyre::Result<()> {
         while let Some(records) = self.node_rx.recv().await {
             let _ = records.iter().for_each(|peer| {
                 println!("attempting to handshake peer: {}", peer);
