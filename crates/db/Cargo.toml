@@ -5,8 +5,11 @@ edition = "2021"
 
 [dependencies]
 # aws
-aws-config = { version = "0.56.1" }
-aws-sdk-dynamodb = { version = "0.33.0" }
+aws-config.workspace = true
+aws-sdk-dynamodb.workspace = true
 
 # types
 reth-crawler-types = { path = "../../crates/types" }
+
+# general
+tokio-stream.workspace = true

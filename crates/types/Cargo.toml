@@ -10,3 +10,6 @@ reth-primitives.workspace = true
 # serialization
 serde_json.workspace = true
 serde.workspace = true
+
+# aws
+aws-sdk-dynamodb.workspace = true
