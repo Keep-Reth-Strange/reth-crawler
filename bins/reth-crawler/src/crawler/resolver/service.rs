@@ -79,8 +79,8 @@ impl ResolverService {
                             country = loc.country;
                             city = loc.city;
                         }
-                        Err(e) => {
-                            eprintln!("Error getting location: {:?}", e);
+                        Err(_) => {
+                            // leave `country` and `city` empty if not able to get them
                         }
                     }
 
