@@ -1,20 +1,17 @@
-use crate::crawler::{
-    db::PeerDB,
-    p2p_utils::{append_to_file, handshake_eth, handshake_p2p, save_peer},
-};
-use crate::types::PeerData;
 use chrono::Utc;
 use futures::future::join;
 use ipgeolocate::{Locator, Service};
 use once_cell::sync::Lazy;
+use reth_crawler_db::PeerDB;
+use reth_crawler_p2p::{handshake_p2p, save_peer};
+use reth_crawler_types::PeerData;
 use reth_discv4::Discv4;
 use reth_dns_discovery::DnsDiscoveryHandle;
+use reth_primitives::mainnet_nodes;
 use reth_primitives::NodeRecord;
 use secp256k1::SecretKey;
 use std::time::Instant;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
-
-use reth_primitives::mainnet_nodes;
 
 pub static MAINNET_BOOT_NODES: Lazy<Vec<NodeRecord>> = Lazy::new(mainnet_nodes);
 

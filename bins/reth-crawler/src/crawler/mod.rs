@@ -1,7 +1,5 @@
-mod db;
 mod factory;
 mod listener;
-mod p2p_utils;
 mod resolver;
 mod service;
 

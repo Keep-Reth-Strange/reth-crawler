@@ -6,8 +6,7 @@ use aws_sdk_dynamodb::types::{
     ScalarAttributeType, Select, TableStatus,
 };
 use aws_sdk_dynamodb::{config::Region, meta::PKG_VERSION, Client, Error};
-
-use crate::types::PeerData;
+use reth_crawler_types::PeerData;
 
 #[derive(Clone)]
 pub struct PeerDB {
@@ -15,7 +14,7 @@ pub struct PeerDB {
 }
 
 impl PeerDB {
-    pub(crate) async fn new() -> Self {
+    pub async fn new() -> Self {
         let region_provider =
             RegionProviderChain::default_provider().or_else(Region::new("us-west-2"));
         let shared_config = aws_config::from_env().region(region_provider).load().await;
@@ -24,7 +23,7 @@ impl PeerDB {
         PeerDB { client }
     }
 
-    pub(crate) async fn add_peer(&self, peer_data: PeerData) -> Result<(), SdkError<PutItemError>> {
+    pub async fn add_peer(&self, peer_data: PeerData) -> Result<(), SdkError<PutItemError>> {
         let peer_id = AttributeValue::S(peer_data.id);
         let peer_ip = AttributeValue::S(peer_data.address);
         let client_version = AttributeValue::S(peer_data.client_version);

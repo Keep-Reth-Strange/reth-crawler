@@ -2,7 +2,7 @@ use reth_primitives::{H256, U256};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
-pub(crate) struct PeerData {
+pub struct PeerData {
     pub enode_url: String,
     pub id: String,
     pub address: String,
