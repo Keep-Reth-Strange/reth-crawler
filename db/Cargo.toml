@@ -4,12 +4,18 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+# reth
+reth-primitives.workspace = true
+
 # aws
 aws-config.workspace = true
 aws-sdk-dynamodb.workspace = true
 
-# types
-reth-crawler-types = { path = "../../crates/types" }
-
 # general
+tokio.workspace = true
 tokio-stream.workspace = true
+eyre.workspace = true
+
+# serialization
+serde_json.workspace = true
+serde.workspace = true

@@ -3,8 +3,7 @@ use axum::{
     routing::get,
     Json, Router,
 };
-use reth_crawler_db::PeerDB;
-use reth_crawler_types::PeerData;
+use reth_crawler_db::{PeerDB, PeerData};
 
 use super::app_state::AppState;
 

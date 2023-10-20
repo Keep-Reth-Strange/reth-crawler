@@ -1,3 +1,4 @@
+use crate::types::PeerData;
 use aws_config::meta::region::RegionProviderChain;
 use aws_sdk_dynamodb::error::SdkError;
 use aws_sdk_dynamodb::operation::put_item::PutItemError;
@@ -8,7 +9,6 @@ use aws_sdk_dynamodb::types::{
     ScalarAttributeType, Select, TableStatus,
 };
 use aws_sdk_dynamodb::{config::Region, meta::PKG_VERSION, Client, Error};
-use reth_crawler_types::PeerData;
 use tokio_stream::StreamExt;
 
 #[derive(Clone)]
