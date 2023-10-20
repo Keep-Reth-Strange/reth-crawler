@@ -1,0 +1,19 @@
+[package]
+name = "reth-crawler-api-server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# general
+axum = { version = "0.6.4", features = ["macros"] }
+serde.workspace = true
+tokio.workspace = true
+aws-sdk-dynamodb.workspace = true
+aws-config.workspace = true
+tokio-stream.workspace = true
+
+# types
+reth-crawler-types = { path = "../../crates/types" }
+
+# db
+reth-crawler-db = { path = "../../crates/db" }

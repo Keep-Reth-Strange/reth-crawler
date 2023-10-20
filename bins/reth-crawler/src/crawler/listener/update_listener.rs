@@ -1,16 +1,14 @@
-use crate::{
-    crawler::{db::PeerDB, p2p_utils::save_peer},
-    types::PeerData,
-};
 use chrono::Utc;
 use futures::StreamExt;
+use reth_crawler_db::PeerDB;
+use reth_crawler_p2p::{handshake_p2p, save_peer};
+use reth_crawler_types::PeerData;
 use reth_discv4::{DiscoveryUpdate, Discv4};
 use reth_dns_discovery::{DnsDiscoveryHandle, DnsNodeRecordUpdate};
 use secp256k1::SecretKey;
 use std::time::Instant;
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::crawler::p2p_utils::{append_to_file, handshake_eth, handshake_p2p};
 use ipgeolocate::{Locator, Service};
 use once_cell::sync::Lazy;
 use reth_primitives::{mainnet_nodes, NodeRecord};
@@ -127,8 +125,8 @@ impl UpdateListener {
                             country = loc.country;
                             city = loc.city;
                         }
-                        Err(e) => {
-                            eprintln!("Error getting location: {:?}", e);
+                        Err(_) => {
+                            // leave `country` and `city` empty if not able to get them
                         }
                     }
 
@@ -253,8 +251,8 @@ impl UpdateListener {
                         country = loc.country;
                         city = loc.city;
                     }
-                    Err(e) => {
-                        eprintln!("Error getting location: {:?}", e);
+                    Err(_) => {
+                        // leave `country` and `city` empty if not able to get them
                     }
                 }
 

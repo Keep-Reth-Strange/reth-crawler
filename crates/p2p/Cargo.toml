@@ -1,0 +1,28 @@
+[package]
+name = "reth-crawler-p2p"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# serialization
+serde_json.workspace = true
+serde.workspace = true
+
+# general
+tokio.workspace = true
+futures.workspace = true
+eyre.workspace = true
+
+# types
+reth-crawler-types = { path = "../../crates/types" }
+
+# db
+reth-crawler-db = { path = "../../crates/db" }
+
+# crypto
+secp256k1.workspace = true
+
+# reth
+reth-primitives.workspace = true
+reth-ecies.workspace = true
+reth-eth-wire.workspace = true

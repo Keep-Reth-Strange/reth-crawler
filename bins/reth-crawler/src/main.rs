@@ -1,5 +1,4 @@
 mod crawler;
-mod types;
 use clap::{Args, Parser, Subcommand};
 use crawler::CrawlerFactory;
 

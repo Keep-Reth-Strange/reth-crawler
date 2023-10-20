@@ -1,6 +1,6 @@
-use super::db::PeerDB;
-use crate::types::PeerData;
 use futures::StreamExt;
+use reth_crawler_db::PeerDB;
+use reth_crawler_types::PeerData;
 use reth_ecies::{stream::ECIESStream, util::pk2id};
 use reth_eth_wire::{
     EthMessage, EthStream, HelloMessage, P2PStream, Status, UnauthedEthStream, UnauthedP2PStream,
@@ -13,7 +13,7 @@ type AuthedP2PStream = P2PStream<ECIESStream<TcpStream>>;
 type AuthedEthStream = EthStream<P2PStream<ECIESStream<TcpStream>>>;
 
 // Perform a P2P handshake with a peer
-pub(crate) async fn handshake_p2p(
+pub async fn handshake_p2p(
     peer: NodeRecord,
     key: SecretKey,
 ) -> eyre::Result<(AuthedP2PStream, HelloMessage)> {
@@ -29,9 +29,7 @@ pub(crate) async fn handshake_p2p(
 }
 
 // Perform a ETH Wire handshake with a peer
-pub(crate) async fn handshake_eth(
-    p2p_stream: AuthedP2PStream,
-) -> eyre::Result<(AuthedEthStream, Status)> {
+pub async fn handshake_eth(p2p_stream: AuthedP2PStream) -> eyre::Result<(AuthedEthStream, Status)> {
     let fork_filter = MAINNET.fork_filter(Head {
         timestamp: MAINNET.fork(Hardfork::Shanghai).as_timestamp().unwrap(),
         ..Default::default()
@@ -53,7 +51,7 @@ pub(crate) async fn handshake_eth(
 
 // Snoop by greedily capturing all broadcasts that the peer emits
 // note: this node cannot handle request so will be disconnected by peer when challenged
-pub(crate) async fn _snoop(peer: NodeRecord, mut eth_stream: AuthedEthStream) {
+pub async fn _snoop(peer: NodeRecord, mut eth_stream: AuthedEthStream) {
     while let Some(Ok(update)) = eth_stream.next().await {
         match update {
             EthMessage::NewPooledTransactionHashes66(txs) => {
@@ -115,7 +113,7 @@ pub(crate) async fn _snoop(peer: NodeRecord, mut eth_stream: AuthedEthStream) {
     }
 }
 
-pub(crate) async fn append_to_file(peer_data: PeerData) -> eyre::Result<()> {
+pub async fn append_to_file(peer_data: PeerData) -> eyre::Result<()> {
     let json = serde_json::to_string(&peer_data)? + "\n";
     let mut file = OpenOptions::new()
         .write(true)
@@ -128,7 +126,7 @@ pub(crate) async fn append_to_file(peer_data: PeerData) -> eyre::Result<()> {
 }
 
 /// Helper function to save a peer.
-pub(crate) async fn save_peer(peer_data: PeerData, save_to_json: bool, db: PeerDB) {
+pub async fn save_peer(peer_data: PeerData, save_to_json: bool, db: PeerDB) {
     if save_to_json {
         match append_to_file(peer_data).await {
             Ok(_) => (),

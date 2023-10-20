@@ -1,0 +1,15 @@
+[package]
+name = "reth-crawler-db"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# aws
+aws-config.workspace = true
+aws-sdk-dynamodb.workspace = true
+
+# types
+reth-crawler-types = { path = "../../crates/types" }
+
+# general
+tokio-stream.workspace = true

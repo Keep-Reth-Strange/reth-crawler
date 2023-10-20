@@ -1,0 +1,39 @@
+[package]
+name = "reth-crawler"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# types
+reth-crawler-types = { path = "../../crates/types" }
+
+# db
+reth-crawler-db = { path = "../../crates/db" }
+
+# p2p
+reth-crawler-p2p = { path = "../../crates/p2p" }
+
+# Reth
+reth-primitives.workspace = true
+reth-network.workspace = true
+reth-discv4.workspace = true
+reth-dns-discovery.workspace = true
+reth-eth-wire.workspace = true
+reth-ecies.workspace = true
+
+# Serialization
+serde_json.workspace = true
+serde.workspace = true
+
+# general
+tokio.workspace = true
+tracing-subscriber.workspace = true
+ipgeolocate = "0.3.5"
+clap = { version = "4.4.6", features = ["derive"] }
+eyre.workspace = true
+futures.workspace = true
+chrono.workspace = true
+once_cell.workspace = true
+
+# crypto
+secp256k1.workspace = true
