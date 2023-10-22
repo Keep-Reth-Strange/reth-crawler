@@ -1,13 +1,11 @@
 use futures::StreamExt;
-use reth_crawler_db::PeerDB;
-use reth_crawler_types::PeerData;
 use reth_ecies::{stream::ECIESStream, util::pk2id};
 use reth_eth_wire::{
     EthMessage, EthStream, HelloMessage, P2PStream, Status, UnauthedEthStream, UnauthedP2PStream,
 };
 use reth_primitives::{Chain, Hardfork, Head, NodeRecord, MAINNET, MAINNET_GENESIS};
 use secp256k1::{SecretKey, SECP256K1};
-use tokio::{fs::OpenOptions, io::AsyncWriteExt, net::TcpStream};
+use tokio::net::TcpStream;
 
 type AuthedP2PStream = P2PStream<ECIESStream<TcpStream>>;
 type AuthedEthStream = EthStream<P2PStream<ECIESStream<TcpStream>>>;
@@ -110,29 +108,5 @@ pub async fn _snoop(peer: NodeRecord, mut eth_stream: AuthedEthStream) {
             }
             _ => {}
         }
-    }
-}
-
-pub async fn append_to_file(peer_data: PeerData) -> eyre::Result<()> {
-    let json = serde_json::to_string(&peer_data)? + "\n";
-    let mut file = OpenOptions::new()
-        .write(true)
-        .append(true)
-        .create(true)
-        .open("peers_data.json")
-        .await?;
-    file.write_all(json.as_bytes()).await?;
-    Ok(())
-}
-
-/// Helper function to save a peer.
-pub async fn save_peer(peer_data: PeerData, save_to_json: bool, db: PeerDB) {
-    if save_to_json {
-        match append_to_file(peer_data).await {
-            Ok(_) => (),
-            Err(e) => eprintln!("Error appending to file: {:?}", e),
-        }
-    } else {
-        db.add_peer(peer_data).await.unwrap();
     }
 }

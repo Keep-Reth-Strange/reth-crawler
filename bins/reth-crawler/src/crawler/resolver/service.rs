@@ -1,10 +1,9 @@
+use crate::p2p::handshake_p2p;
 use chrono::Utc;
 use futures::future::join;
 use ipgeolocate::{Locator, Service};
 use once_cell::sync::Lazy;
-use reth_crawler_db::PeerDB;
-use reth_crawler_p2p::{handshake_p2p, save_peer};
-use reth_crawler_types::PeerData;
+use reth_crawler_db::{save_peer, PeerDB, PeerData};
 use reth_discv4::Discv4;
 use reth_dns_discovery::DnsDiscoveryHandle;
 use reth_primitives::mainnet_nodes;

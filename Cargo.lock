@@ -4157,8 +4157,6 @@ dependencies = [
  "ipgeolocate",
  "once_cell",
  "reth-crawler-db",
- "reth-crawler-p2p",
- "reth-crawler-types",
  "reth-discv4",
  "reth-dns-discovery",
  "reth-ecies",
@@ -4180,7 +4178,6 @@ dependencies = [
  "aws-sdk-dynamodb",
  "axum",
  "reth-crawler-db",
- "reth-crawler-types",
  "serde",
  "tokio",
  "tokio-stream",
@@ -4192,35 +4189,12 @@ version = "0.1.0"
 dependencies = [
  "aws-config",
  "aws-sdk-dynamodb",
- "reth-crawler-types",
- "tokio-stream",
-]
-
-[[package]]
-name = "reth-crawler-p2p"
-version = "0.1.0"
-dependencies = [
  "eyre",
- "futures",
- "reth-crawler-db",
- "reth-crawler-types",
- "reth-ecies",
- "reth-eth-wire",
  "reth-primitives",
- "secp256k1",
  "serde",
  "serde_json",
  "tokio",
-]
-
-[[package]]
-name = "reth-crawler-types"
-version = "0.1.0"
-dependencies = [
- "aws-sdk-dynamodb",
- "reth-primitives",
- "serde",
- "serde_json",
+ "tokio-stream",
 ]
 
 [[package]]

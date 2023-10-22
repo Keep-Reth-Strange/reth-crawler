@@ -4,14 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-# types
-reth-crawler-types = { path = "../../crates/types" }
 
 # db
-reth-crawler-db = { path = "../../crates/db" }
-
-# p2p
-reth-crawler-p2p = { path = "../../crates/p2p" }
+reth-crawler-db = { path = "../../db" }
 
 # Reth
 reth-primitives.workspace = true

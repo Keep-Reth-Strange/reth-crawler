@@ -1,6 +1,7 @@
 [workspace]
+resolver = "2"
 
-members = ["bins/*", "crates/*"]
+members = ["bins/*", "db"]
 
 [workspace.dependencies]
 # reth

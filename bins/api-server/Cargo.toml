@@ -12,8 +12,5 @@ aws-sdk-dynamodb.workspace = true
 aws-config.workspace = true
 tokio-stream.workspace = true
 
-# types
-reth-crawler-types = { path = "../../crates/types" }
-
 # db
-reth-crawler-db = { path = "../../crates/db" }
+reth-crawler-db = { path = "../../db" }
