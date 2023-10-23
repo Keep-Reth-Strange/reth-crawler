@@ -4,6 +4,7 @@ use axum::routing;
 use axum::Json;
 use axum::Router;
 use dynamodb::{rest_router, AppState};
+use tracing::info;
 use std::net::SocketAddr;
 
 #[tokio::main]
@@ -14,7 +15,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_state(AppState::new().await);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3030));
-    println!("Server started, listening on {addr}");
+    info!("Server started, listening on {addr}");
 
     axum::Server::bind(&addr)
         .serve(app.into_make_service())

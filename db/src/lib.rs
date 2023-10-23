@@ -5,6 +5,7 @@ use tokio::{fs::OpenOptions, io::AsyncWriteExt};
 
 // Re-exports
 pub use db::PeerDB;
+use tracing::error;
 pub use types::PeerData;
 
 /// Helper function to append a peer to file
@@ -25,7 +26,7 @@ pub async fn save_peer(peer_data: PeerData, save_to_json: bool, db: PeerDB) {
     if save_to_json {
         match append_to_file(peer_data).await {
             Ok(_) => (),
-            Err(e) => eprintln!("Error appending to file: {:?}", e),
+            Err(e) => error!("Error appending to file: {:?}", e),
         }
     } else {
         db.add_peer(peer_data).await.unwrap();

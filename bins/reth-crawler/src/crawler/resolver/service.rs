@@ -11,6 +11,7 @@ use reth_primitives::NodeRecord;
 use secp256k1::SecretKey;
 use std::time::Instant;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+use tracing::info;
 
 pub static MAINNET_BOOT_NODES: Lazy<Vec<NodeRecord>> = Lazy::new(mainnet_nodes);
 
@@ -41,14 +42,14 @@ impl ResolverService {
     pub async fn start(mut self, save_to_json: bool) -> eyre::Result<()> {
         while let Some(records) = self.node_rx.recv().await {
             let _ = records.iter().for_each(|peer| {
-                println!("attempting to handshake peer: {}", peer);
+                info!("attempting to handshake peer: {}", peer);
                 let peer = peer.clone();
                 let db = self.db.clone();
                 tokio::spawn(async move {
                     let (p2p_stream, their_hello) = match handshake_p2p(peer, self.key).await {
                         Ok(s) => s,
                         Err(e) => {
-                            println!("Failed P2P handshake with peer {}, {}", peer.address, e);
+                            info!("Failed P2P handshake with peer {}, {}", peer.address, e);
                             return;
                         }
                     };
@@ -56,13 +57,13 @@ impl ResolverService {
                     let (_eth_stream, their_status) = match handshake_eth(p2p_stream).await {
                         Ok(s) => s,
                         Err(e) => {
-                            println!("Failed ETH handshake with peer {}, {}", peer.address, e);
+                            info!("Failed ETH handshake with peer {}, {}", peer.address, e);
                             return;
                         }
                     };*/
 
                     let last_seen = Utc::now().to_string();
-                    println!(
+                    info!(
                         "Successfully connected to a peer at {}:{} ({}) using eth-wire version eth",
                         peer.address, peer.tcp_port, their_hello.client_version
                     );
