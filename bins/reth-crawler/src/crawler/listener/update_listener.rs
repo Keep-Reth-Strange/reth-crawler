@@ -8,9 +8,9 @@ use reth_discv4::{DiscoveryUpdate, Discv4};
 use reth_dns_discovery::{DnsDiscoveryHandle, DnsNodeRecordUpdate};
 use reth_primitives::{mainnet_nodes, NodeRecord};
 use secp256k1::SecretKey;
-use tracing::info;
 use std::time::Instant;
 use tokio::sync::mpsc::UnboundedSender;
+use tracing::info;
 
 pub static MAINNET_BOOT_NODES: Lazy<Vec<NodeRecord>> = Lazy::new(mainnet_nodes);
 

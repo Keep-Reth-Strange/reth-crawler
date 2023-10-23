@@ -4,8 +4,8 @@ use axum::routing;
 use axum::Json;
 use axum::Router;
 use dynamodb::{rest_router, AppState};
-use tracing::info;
 use std::net::SocketAddr;
+use tracing::info;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
