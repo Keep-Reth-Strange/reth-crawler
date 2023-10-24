@@ -49,7 +49,7 @@ impl CrawlerFactory {
         }
     }
 
-    pub async fn make(&self) -> CrawlerService {
-        CrawlerService::new(self.discv4.clone(), self.dnsdisc.clone(), self.key).await
+    pub async fn make(&self, in_memory_db: bool) -> CrawlerService {
+        CrawlerService::new(self.discv4.clone(), self.dnsdisc.clone(), self.key, in_memory_db).await
     }
 }

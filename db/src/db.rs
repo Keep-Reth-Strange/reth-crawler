@@ -11,8 +11,7 @@ use std::sync::{Arc, RwLock};
 use tokio_stream::StreamExt;
 
 #[async_trait]
-pub trait PeerDB {
-    async fn new() -> Self;
+pub trait PeerDB: Send + Sync {
     async fn add_peer(&self, peer_data: PeerData) -> Result<(), AddItemError>;
     async fn all_peers(&self, page_size: Option<i32>) -> Result<Vec<PeerData>, ScanTableError>;
     async fn node_by_id(&self, id: String) -> Result<Option<Vec<PeerData>>, QueryItemError>;
@@ -24,9 +23,8 @@ pub struct AwsPeerDB {
     client: Client,
 }
 
-#[async_trait]
-impl PeerDB for AwsPeerDB {
-    async fn new() -> Self {
+impl AwsPeerDB {
+    pub async fn new() -> Self {
         let region_provider =
             RegionProviderChain::default_provider().or_else(Region::new("us-west-2"));
         let shared_config = aws_config::from_env().region(region_provider).load().await;
@@ -34,7 +32,10 @@ impl PeerDB for AwsPeerDB {
 
         AwsPeerDB { client }
     }
+}
 
+#[async_trait]
+impl PeerDB for AwsPeerDB {
     async fn add_peer(&self, peer_data: PeerData) -> Result<(), AddItemError> {
         let peer_id = AttributeValue::S(peer_data.id);
         let peer_ip = AttributeValue::S(peer_data.address);
@@ -139,30 +140,40 @@ pub struct InMemoryPeerDB {
     db: Arc<RwLock<HashMap<String, PeerData>>>,
 }
 
-#[async_trait]
-impl PeerDB for InMemoryPeerDB {
-    async fn new() -> Self {
+impl InMemoryPeerDB {
+    pub fn new() -> Self {
         Self {
             db: Arc::new(RwLock::new(HashMap::new())),
         }
     }
+}
+
+#[async_trait]
+impl PeerDB for InMemoryPeerDB {
     async fn add_peer(&self, peer_data: PeerData) -> Result<(), AddItemError> {
         let mut db = self
             .db
             .write()
             .map_err(|_| AddItemError::InMemoryDbAddItemError())?;
-        db.insert(peer_data.id, peer_data);
+        db.insert(peer_data.id.clone(), peer_data);
         Ok(())
     }
+
     async fn all_peers(&self, page_size: Option<i32>) -> Result<Vec<PeerData>, ScanTableError> {
-        let mut db = self
+        let page_size = page_size.unwrap_or(50);
+        let db = self
             .db
             .read()
             .map_err(|_| ScanTableError::InMemoryDbScanError())?;
-        Ok(db.iter().map(|(_, peer_data)| peer_data.clone()).collect())
+        Ok(db
+            .iter()
+            .map(|(_, peer_data)| peer_data.clone())
+            .take(page_size as usize)
+            .collect())
     }
+
     async fn node_by_id(&self, id: String) -> Result<Option<Vec<PeerData>>, QueryItemError> {
-        let mut db = self
+        let db = self
             .db
             .read()
             .map_err(|_| QueryItemError::InMemoryDbQueryItemError())?;
@@ -173,8 +184,9 @@ impl PeerDB for InMemoryPeerDB {
                 .collect(),
         ))
     }
+
     async fn node_by_ip(&self, ip: String) -> Result<Option<Vec<PeerData>>, QueryItemError> {
-        let mut db = self
+        let db = self
             .db
             .read()
             .map_err(|_| QueryItemError::InMemoryDbQueryItemError())?;

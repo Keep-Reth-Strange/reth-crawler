@@ -1,10 +1,11 @@
 pub mod db;
 pub mod types;
 
+use std::sync::Arc;
 use tokio::{fs::OpenOptions, io::AsyncWriteExt};
 
 // Re-exports
-pub use db::AwsPeerDB;
+pub use db::{AwsPeerDB, InMemoryPeerDB, PeerDB};
 use tracing::error;
 pub use types::PeerData;
 
@@ -22,7 +23,7 @@ pub async fn append_to_file(peer_data: PeerData) -> eyre::Result<()> {
 }
 
 /// Helper function to save a peer.
-pub async fn save_peer(peer_data: PeerData, save_to_json: bool, db: AwsPeerDB) {
+pub async fn save_peer(peer_data: PeerData, save_to_json: bool, db: Arc<dyn PeerDB>) {
     if save_to_json {
         match append_to_file(peer_data).await {
             Ok(_) => (),

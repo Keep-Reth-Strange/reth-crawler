@@ -12,10 +12,23 @@ pub struct CrawlerService {
 }
 
 impl CrawlerService {
-    pub async fn new(discv4: Discv4, dnsdisc: DnsDiscoveryHandle, key: SecretKey) -> Self {
+    pub async fn new(
+        discv4: Discv4,
+        dnsdisc: DnsDiscoveryHandle,
+        key: SecretKey,
+        in_memory_db: bool,
+    ) -> Self {
         let (tx, rx) = mpsc::unbounded_channel::<Vec<NodeRecord>>();
-        let updates = UpdateListener::new(discv4.clone(), dnsdisc.clone(), key, tx.clone()).await;
-        Self { updates }
+        let updates = UpdateListener::new(
+            discv4.clone(),
+            dnsdisc.clone(),
+            key,
+            tx.clone(),
+            in_memory_db,
+        )
+        .await;
+        let resolver = ResolverService::new(key, tx, rx, in_memory_db).await;
+        Self { updates, resolver }
     }
 
     pub async fn run(self, save_to_json: bool) -> (eyre::Result<()>, eyre::Result<()>) {

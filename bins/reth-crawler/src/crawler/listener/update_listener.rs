@@ -3,11 +3,12 @@ use chrono::Utc;
 use futures::StreamExt;
 use ipgeolocate::{Locator, Service};
 use once_cell::sync::Lazy;
-use reth_crawler_db::{save_peer, AwsPeerDB, PeerData};
+use reth_crawler_db::{save_peer, AwsPeerDB, InMemoryPeerDB, PeerDB, PeerData};
 use reth_discv4::{DiscoveryUpdate, Discv4};
 use reth_dns_discovery::{DnsDiscoveryHandle, DnsNodeRecordUpdate};
 use reth_primitives::{mainnet_nodes, NodeRecord};
 use secp256k1::SecretKey;
+use std::{sync::Arc, time::Instant};
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::info;
 
@@ -16,7 +17,7 @@ pub struct UpdateListener {
     dnsdisc: DnsDiscoveryHandle,
     key: SecretKey,
     node_tx: UnboundedSender<Vec<NodeRecord>>,
-    db: AwsPeerDB,
+    db: Arc<dyn PeerDB>,
 }
 
 impl UpdateListener {
@@ -25,14 +26,24 @@ impl UpdateListener {
         dnsdisc: DnsDiscoveryHandle,
         key: SecretKey,
         node_tx: UnboundedSender<Vec<NodeRecord>>,
+        in_memory_db: bool,
     ) -> Self {
-        let db = AwsPeerDB::new().await;
-        UpdateListener {
-            discv4,
-            dnsdisc,
-            key,
-            node_tx,
-            db,
+        if in_memory_db {
+            UpdateListener {
+                discv4,
+                dnsdisc,
+                key,
+                node_tx,
+                db: Arc::new(InMemoryPeerDB::new()),
+            }
+        } else {
+            UpdateListener {
+                discv4,
+                dnsdisc,
+                key,
+                node_tx,
+                db: Arc::new(AwsPeerDB::new().await),
+            }
         }
     }
 
@@ -127,7 +138,7 @@ impl UpdateListener {
         let mut dnsdisc_update_stream = self.dnsdisc.node_record_stream().await?;
         let key = self.key;
         while let Some(update) = dnsdisc_update_stream.next().await {
-            let db: AwsPeerDB = self.db.clone();
+            let db = self.db.clone();
             let DnsNodeRecordUpdate {
                 node_record: peer,
                 fork_id,

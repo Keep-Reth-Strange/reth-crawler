@@ -3,12 +3,14 @@ use chrono::Utc;
 use futures::future::join;
 use ipgeolocate::{Locator, Service};
 use once_cell::sync::Lazy;
-use reth_crawler_db::{save_peer, AwsPeerDB, PeerData};
+use reth_crawler_db::{save_peer, PeerDB, PeerData};
+use reth_crawler_db::{AwsPeerDB, InMemoryPeerDB};
 use reth_discv4::Discv4;
 use reth_dns_discovery::DnsDiscoveryHandle;
 use reth_primitives::mainnet_nodes;
 use reth_primitives::NodeRecord;
 use secp256k1::SecretKey;
+use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
@@ -18,7 +20,7 @@ pub struct ResolverService {
     key: SecretKey,
     node_tx: UnboundedSender<Vec<NodeRecord>>,
     node_rx: UnboundedReceiver<Vec<NodeRecord>>,
-    db: AwsPeerDB,
+    db: Arc<dyn PeerDB>,
 }
 
 impl ResolverService {
@@ -26,13 +28,22 @@ impl ResolverService {
         key: SecretKey,
         node_tx: UnboundedSender<Vec<NodeRecord>>,
         node_rx: UnboundedReceiver<Vec<NodeRecord>>,
+        in_memory_db: bool,
     ) -> Self {
-        let db = AwsPeerDB::new().await;
-        ResolverService {
-            key,
-            node_tx,
-            node_rx,
-            db,
+        if in_memory_db {
+            ResolverService {
+                key,
+                node_tx,
+                node_rx,
+                db: Arc::new(InMemoryPeerDB::new()),
+            }
+        } else {
+            ResolverService {
+                key,
+                node_tx,
+                node_rx,
+                db: Arc::new(AwsPeerDB::new().await),
+            }
         }
     }
 
