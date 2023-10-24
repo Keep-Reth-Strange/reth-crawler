@@ -37,7 +37,7 @@ async fn main() {
 
     match &cli.command {
         Commands::Crawl(opts) => {
-            let (_, _, _) = CrawlerFactory::new()
+            let (_, _) = CrawlerFactory::new()
                 .await
                 .make()
                 .await
