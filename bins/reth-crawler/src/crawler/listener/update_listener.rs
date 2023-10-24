@@ -10,6 +10,7 @@ use reth_primitives::{mainnet_nodes, NodeRecord};
 use secp256k1::SecretKey;
 use std::time::Instant;
 use tokio::sync::mpsc::UnboundedSender;
+use tracing::info;
 
 pub static MAINNET_BOOT_NODES: Lazy<Vec<NodeRecord>> = Lazy::new(mainnet_nodes);
 
@@ -50,7 +51,7 @@ impl UpdateListener {
                     let (p2p_stream, their_hello) = match handshake_p2p(peer, key).await {
                         Ok(s) => s,
                         Err(e) => {
-                            println!("Failed P2P handshake with peer {}, {}", peer.address, e);
+                            info!("Failed P2P handshake with peer {}, {}", peer.address, e);
                             return;
                         }
                     };
@@ -58,14 +59,14 @@ impl UpdateListener {
                     let (eth_stream, their_status) = match handshake_eth(p2p_stream).await {
                         Ok(s) => s,
                         Err(e) => {
-                            println!("Failed ETH handshake with peer {}, {}", peer.address, e);
+                            info!("Failed ETH handshake with peer {}, {}", peer.address, e);
                             return;
                         }
                     }; */
 
                     let last_seen = Utc::now().to_string();
 
-                    println!(
+                    info!(
                         "Successfully connected to a peer at {}:{} ({}) using eth-wire version eth/{:#?}",
                         peer.address, peer.tcp_port, their_hello.client_version, their_hello.protocol_version
                     );
@@ -74,15 +75,15 @@ impl UpdateListener {
 
                     // we're probably already traversing a bootnode from Discv4::bootstrap(), so no need to kick another lookup
                     if MAINNET_BOOT_NODES.contains(&peer) {
-                        println!("last node was a bootnode: {}", peer);
+                        info!("last node was a bootnode: {}", peer);
                     } else {
                         let self_lookup = captured_discv4.lookup_self().await;
-                        println!("Recieved {:#?} from self_lookup", self_lookup);
+                        info!("Recieved {:#?} from self_lookup", self_lookup);
                         match self_lookup {
                             Ok(nodes) => {
-                                println!("nodes len: {}", nodes.len());
+                                info!("nodes len: {}", nodes.len());
                                 if nodes.len() > 0 {
-                                    println!("sending self lookup res to resolver");
+                                    info!("sending self lookup res to resolver");
                                     // send to resolver
                                     node_tx.send(nodes).unwrap();
                                 }
@@ -92,7 +93,7 @@ impl UpdateListener {
 
                         let lookup_start = Instant::now();
                         let lookup_res = captured_discv4.lookup(peer.id).await;
-                        println!(
+                        info!(
                             "Recieved {:#?} from : {} with time taken: {:#?}",
                             lookup_res,
                             peer.address,
@@ -100,9 +101,9 @@ impl UpdateListener {
                         );
                         match lookup_res {
                             Ok(nodes) => {
-                                println!("nodes len: {}", nodes.len());
+                                info!("nodes len: {}", nodes.len());
                                 if nodes.len() > 0 {
-                                    println!("sending to resolver");
+                                    info!("sending to resolver");
                                     // send to resolver
                                     node_tx.send(nodes).unwrap();
                                 }
@@ -178,7 +179,7 @@ impl UpdateListener {
                 let (p2p_stream, their_hello) = match handshake_p2p(peer, key).await {
                     Ok(s) => s,
                     Err(e) => {
-                        println!("Failed P2P handshake with peer {}, {}", peer.address, e);
+                        info!("Failed P2P handshake with peer {}, {}", peer.address, e);
                         return;
                     }
                 };
@@ -186,29 +187,29 @@ impl UpdateListener {
                 let (_eth_stream, their_status) = match handshake_eth(p2p_stream).await {
                     Ok(s) => s,
                     Err(e) => {
-                        println!("Failed ETH handshake with peer {}, {}", peer.address, e);
+                        info!("Failed ETH handshake with peer {}, {}", peer.address, e);
                         return;
                     }
                 }; */
 
                 let last_seen = Utc::now().to_string();
 
-                println!(
+                info!(
                         "Successfully connected to a peer at {}:{} ({}) using eth-wire version eth/{:#?}",
                         peer.address, peer.tcp_port, their_hello.client_version, their_hello.protocol_version
                     );
                 /*
                                // we're probably already traversing a bootnode from Discv4::bootstrap(), so no need to kick another lookup
                                if MAINNET_BOOT_NODES.contains(&peer) {
-                                   println!("last node was a bootnode: {}", peer);
+                                   info!("last node was a bootnode: {}", peer);
                                } else {
                                    let self_lookup = captured_discv4.lookup_self().await;
-                                   println!("Recieved {:#?} from self_lookup", self_lookup);
+                                   info!("Recieved {:#?} from self_lookup", self_lookup);
                                    match self_lookup {
                                        Ok(nodes) => {
-                                           println!("nodes len: {}", nodes.len());
+                                           info!("nodes len: {}", nodes.len());
                                            if nodes.len() > 0 {
-                                               println!("sending self lookup res to resolver");
+                                               info!("sending self lookup res to resolver");
                                                // send to resolver
                                                node_tx.send(nodes).unwrap();
                                            }
@@ -218,7 +219,7 @@ impl UpdateListener {
 
                                    let lookup_start = Instant::now();
                                    let lookup_res = captured_discv4.lookup(peer.id).await;
-                                   println!(
+                                   info!(
                                        "Recieved {:#?} from : {} with time taken: {:#?}",
                                        lookup_res,
                                        peer.address,
@@ -226,9 +227,9 @@ impl UpdateListener {
                                    );
                                    match lookup_res {
                                        Ok(nodes) => {
-                                           println!("nodes len: {}", nodes.len());
+                                           info!("nodes len: {}", nodes.len());
                                            if nodes.len() > 0 {
-                                               println!("sending to resolver");
+                                               info!("sending to resolver");
                                                // send to resolver
                                                node_tx.send(nodes).unwrap();
                                            }

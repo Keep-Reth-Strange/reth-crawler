@@ -4167,6 +4167,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+ "tracing",
  "tracing-subscriber",
 ]
 
@@ -4181,6 +4182,7 @@ dependencies = [
  "serde",
  "tokio",
  "tokio-stream",
+ "tracing",
 ]
 
 [[package]]
@@ -4195,6 +4197,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "tokio-stream",
+ "tracing",
 ]
 
 [[package]]
