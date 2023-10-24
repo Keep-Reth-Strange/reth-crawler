@@ -27,8 +27,7 @@ impl CrawlerService {
             in_memory_db,
         )
         .await;
-        let resolver = ResolverService::new(key, tx, rx, in_memory_db).await;
-        Self { updates, resolver }
+        Self { updates }
     }
 
     pub async fn run(self, save_to_json: bool) -> (eyre::Result<()>, eyre::Result<()>) {
