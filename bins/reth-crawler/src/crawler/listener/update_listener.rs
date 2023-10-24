@@ -8,11 +8,8 @@ use reth_discv4::{DiscoveryUpdate, Discv4};
 use reth_dns_discovery::{DnsDiscoveryHandle, DnsNodeRecordUpdate};
 use reth_primitives::{mainnet_nodes, NodeRecord};
 use secp256k1::SecretKey;
-use std::time::Instant;
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::info;
-
-pub static MAINNET_BOOT_NODES: Lazy<Vec<NodeRecord>> = Lazy::new(mainnet_nodes);
 
 pub struct UpdateListener {
     discv4: Discv4,
@@ -70,47 +67,6 @@ impl UpdateListener {
                         "Successfully connected to a peer at {}:{} ({}) using eth-wire version eth/{:#?}",
                         peer.address, peer.tcp_port, their_hello.client_version, their_hello.protocol_version
                     );
-
-                    /*
-
-                    // we're probably already traversing a bootnode from Discv4::bootstrap(), so no need to kick another lookup
-                    if MAINNET_BOOT_NODES.contains(&peer) {
-                        info!("last node was a bootnode: {}", peer);
-                    } else {
-                        let self_lookup = captured_discv4.lookup_self().await;
-                        info!("Recieved {:#?} from self_lookup", self_lookup);
-                        match self_lookup {
-                            Ok(nodes) => {
-                                info!("nodes len: {}", nodes.len());
-                                if nodes.len() > 0 {
-                                    info!("sending self lookup res to resolver");
-                                    // send to resolver
-                                    node_tx.send(nodes).unwrap();
-                                }
-                            }
-                            Err(_) => {}
-                        }
-
-                        let lookup_start = Instant::now();
-                        let lookup_res = captured_discv4.lookup(peer.id).await;
-                        info!(
-                            "Recieved {:#?} from : {} with time taken: {:#?}",
-                            lookup_res,
-                            peer.address,
-                            lookup_start.elapsed()
-                        );
-                        match lookup_res {
-                            Ok(nodes) => {
-                                info!("nodes len: {}", nodes.len());
-                                if nodes.len() > 0 {
-                                    info!("sending to resolver");
-                                    // send to resolver
-                                    node_tx.send(nodes).unwrap();
-                                }
-                            }
-                            Err(_) => {}
-                        }
-                    }*/
 
                     // get peer location
                     let service = Service::IpApi;
@@ -198,46 +154,6 @@ impl UpdateListener {
                         "Successfully connected to a peer at {}:{} ({}) using eth-wire version eth/{:#?}",
                         peer.address, peer.tcp_port, their_hello.client_version, their_hello.protocol_version
                     );
-                /*
-                               // we're probably already traversing a bootnode from Discv4::bootstrap(), so no need to kick another lookup
-                               if MAINNET_BOOT_NODES.contains(&peer) {
-                                   info!("last node was a bootnode: {}", peer);
-                               } else {
-                                   let self_lookup = captured_discv4.lookup_self().await;
-                                   info!("Recieved {:#?} from self_lookup", self_lookup);
-                                   match self_lookup {
-                                       Ok(nodes) => {
-                                           info!("nodes len: {}", nodes.len());
-                                           if nodes.len() > 0 {
-                                               info!("sending self lookup res to resolver");
-                                               // send to resolver
-                                               node_tx.send(nodes).unwrap();
-                                           }
-                                       }
-                                       Err(_) => {}
-                                   }
-
-                                   let lookup_start = Instant::now();
-                                   let lookup_res = captured_discv4.lookup(peer.id).await;
-                                   info!(
-                                       "Recieved {:#?} from : {} with time taken: {:#?}",
-                                       lookup_res,
-                                       peer.address,
-                                       lookup_start.elapsed()
-                                   );
-                                   match lookup_res {
-                                       Ok(nodes) => {
-                                           info!("nodes len: {}", nodes.len());
-                                           if nodes.len() > 0 {
-                                               info!("sending to resolver");
-                                               // send to resolver
-                                               node_tx.send(nodes).unwrap();
-                                           }
-                                       }
-                                       Err(_) => {}
-                                   }
-                               }
-                */
                 // get peer location
                 let service = Service::IpApi;
                 let ip_addr = peer.address.to_string();
