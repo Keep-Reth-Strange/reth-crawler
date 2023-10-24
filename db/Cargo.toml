@@ -12,6 +12,8 @@ aws-config.workspace = true
 aws-sdk-dynamodb.workspace = true
 
 # general
+async-trait.workspace = true
+thiserror.workspace = true
 tokio.workspace = true
 tokio-stream.workspace = true
 eyre.workspace = true

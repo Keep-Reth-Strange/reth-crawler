@@ -1,32 +1,41 @@
-use crate::types::PeerData;
+use crate::types::{AddItemError, PeerData, QueryItemError, ScanTableError};
+use async_trait::async_trait;
 use aws_config::meta::region::RegionProviderChain;
-use aws_sdk_dynamodb::error::SdkError;
-use aws_sdk_dynamodb::operation::put_item::PutItemError;
-use aws_sdk_dynamodb::operation::query::QueryError;
-use aws_sdk_dynamodb::operation::scan::ScanError;
 use aws_sdk_dynamodb::types::{
     AttributeDefinition, AttributeValue, KeySchemaElement, KeyType, ProvisionedThroughput,
     ScalarAttributeType, Select, TableStatus,
 };
 use aws_sdk_dynamodb::{config::Region, meta::PKG_VERSION, Client, Error};
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
 use tokio_stream::StreamExt;
 
+#[async_trait]
+pub trait PeerDB {
+    async fn new() -> Self;
+    async fn add_peer(&self, peer_data: PeerData) -> Result<(), AddItemError>;
+    async fn all_peers(&self, page_size: Option<i32>) -> Result<Vec<PeerData>, ScanTableError>;
+    async fn node_by_id(&self, id: String) -> Result<Option<Vec<PeerData>>, QueryItemError>;
+    async fn node_by_ip(&self, ip: String) -> Result<Option<Vec<PeerData>>, QueryItemError>;
+}
+
 #[derive(Clone)]
-pub struct PeerDB {
+pub struct AwsPeerDB {
     client: Client,
 }
 
-impl PeerDB {
-    pub async fn new() -> Self {
+#[async_trait]
+impl PeerDB for AwsPeerDB {
+    async fn new() -> Self {
         let region_provider =
             RegionProviderChain::default_provider().or_else(Region::new("us-west-2"));
         let shared_config = aws_config::from_env().region(region_provider).load().await;
         let client = Client::new(&shared_config);
 
-        PeerDB { client }
+        AwsPeerDB { client }
     }
 
-    pub async fn add_peer(&self, peer_data: PeerData) -> Result<(), SdkError<PutItemError>> {
+    async fn add_peer(&self, peer_data: PeerData) -> Result<(), AddItemError> {
         let peer_id = AttributeValue::S(peer_data.id);
         let peer_ip = AttributeValue::S(peer_data.address);
         let client_version = AttributeValue::S(peer_data.client_version);
@@ -62,14 +71,11 @@ impl PeerDB {
             .await
         {
             Ok(_) => Ok(()),
-            Err(e) => Err(e),
+            Err(e) => Err(e.into()),
         }
     }
 
-    pub async fn all_peers(
-        &self,
-        page_size: Option<i32>,
-    ) -> Result<Vec<PeerData>, SdkError<ScanError>> {
+    async fn all_peers(&self, page_size: Option<i32>) -> Result<Vec<PeerData>, ScanTableError> {
         let page_size = page_size.unwrap_or(50);
         let results: Result<Vec<_>, _> = self
             .client
@@ -84,14 +90,11 @@ impl PeerDB {
 
         match results {
             Ok(peers) => peers.iter().map(|peer| Ok(peer.into())).collect(),
-            Err(err) => Err(err),
+            Err(err) => Err(err.into()),
         }
     }
 
-    pub async fn node_by_id(
-        &self,
-        id: String,
-    ) -> Result<Option<Vec<PeerData>>, SdkError<QueryError>> {
+    async fn node_by_id(&self, id: String) -> Result<Option<Vec<PeerData>>, QueryItemError> {
         let results = self
             .client
             .query()
@@ -110,10 +113,7 @@ impl PeerDB {
         }
     }
 
-    pub async fn node_by_ip(
-        &self,
-        ip: String,
-    ) -> Result<Option<Vec<PeerData>>, SdkError<QueryError>> {
+    async fn node_by_ip(&self, ip: String) -> Result<Option<Vec<PeerData>>, QueryItemError> {
         let results = self
             .client
             .query()
@@ -131,5 +131,58 @@ impl PeerDB {
         } else {
             Ok(None)
         }
+    }
+}
+
+#[derive(Clone)]
+pub struct InMemoryPeerDB {
+    db: Arc<RwLock<HashMap<String, PeerData>>>,
+}
+
+#[async_trait]
+impl PeerDB for InMemoryPeerDB {
+    async fn new() -> Self {
+        Self {
+            db: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+    async fn add_peer(&self, peer_data: PeerData) -> Result<(), AddItemError> {
+        let mut db = self
+            .db
+            .write()
+            .map_err(|_| AddItemError::InMemoryDbAddItemError())?;
+        db.insert(peer_data.id, peer_data);
+        Ok(())
+    }
+    async fn all_peers(&self, page_size: Option<i32>) -> Result<Vec<PeerData>, ScanTableError> {
+        let mut db = self
+            .db
+            .read()
+            .map_err(|_| ScanTableError::InMemoryDbScanError())?;
+        Ok(db.iter().map(|(_, peer_data)| peer_data.clone()).collect())
+    }
+    async fn node_by_id(&self, id: String) -> Result<Option<Vec<PeerData>>, QueryItemError> {
+        let mut db = self
+            .db
+            .read()
+            .map_err(|_| QueryItemError::InMemoryDbQueryItemError())?;
+        Ok(Some(
+            db.iter()
+                .filter(|(peer_id, _)| **peer_id == id)
+                .map(|(_, peer_data)| peer_data.clone())
+                .collect(),
+        ))
+    }
+    async fn node_by_ip(&self, ip: String) -> Result<Option<Vec<PeerData>>, QueryItemError> {
+        let mut db = self
+            .db
+            .read()
+            .map_err(|_| QueryItemError::InMemoryDbQueryItemError())?;
+        Ok(Some(
+            db.iter()
+                .filter(|(_, peer_data)| peer_data.address == ip)
+                .map(|(_, peer_data)| peer_data.clone())
+                .collect(),
+        ))
     }
 }

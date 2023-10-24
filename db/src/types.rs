@@ -1,10 +1,15 @@
 use reth_primitives::{H256, U256};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use thiserror::Error;
 
-use aws_sdk_dynamodb::types::AttributeValue;
+use aws_sdk_dynamodb::{
+    error::SdkError,
+    operation::{put_item::PutItemError, query::QueryError, scan::ScanError},
+    types::AttributeValue,
+};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct PeerData {
     pub enode_url: String,
     pub id: String,
@@ -122,4 +127,28 @@ pub fn as_string_vec(val: Option<&AttributeValue>) -> Vec<String> {
         }
     }
     vec![]
+}
+
+#[derive(Debug, Error)]
+pub enum AddItemError {
+    #[error("An error occurred adding a new item into the AWS database: {0}")]
+    AwsAddItemError(#[from] SdkError<PutItemError>),
+    #[error("An error occurred adding a new item into the in memory db")]
+    InMemoryDbAddItemError(),
+}
+
+#[derive(Debug, Error)]
+pub enum ScanTableError {
+    #[error("An error occurred while performing a scan of the AWS database: {0}")]
+    AwsScanError(#[from] SdkError<ScanError>),
+    #[error("An error occurred while performing a scan of the in memory database")]
+    InMemoryDbScanError(),
+}
+
+#[derive(Debug, Error)]
+pub enum QueryItemError {
+    #[error("An error occurred querying the AWS database: {0}")]
+    AwsQueryItemError(#[from] SdkError<QueryError>),
+    #[error("An error occurred querying the in memory database")]
+    InMemoryDbQueryItemError(),
 }

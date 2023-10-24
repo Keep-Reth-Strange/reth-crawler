@@ -3,7 +3,7 @@ use chrono::Utc;
 use futures::StreamExt;
 use ipgeolocate::{Locator, Service};
 use once_cell::sync::Lazy;
-use reth_crawler_db::{save_peer, PeerDB, PeerData};
+use reth_crawler_db::{save_peer, AwsPeerDB, PeerData};
 use reth_discv4::{DiscoveryUpdate, Discv4};
 use reth_dns_discovery::{DnsDiscoveryHandle, DnsNodeRecordUpdate};
 use reth_primitives::{mainnet_nodes, NodeRecord};
@@ -16,7 +16,7 @@ pub struct UpdateListener {
     dnsdisc: DnsDiscoveryHandle,
     key: SecretKey,
     node_tx: UnboundedSender<Vec<NodeRecord>>,
-    db: PeerDB,
+    db: AwsPeerDB,
 }
 
 impl UpdateListener {
@@ -26,7 +26,7 @@ impl UpdateListener {
         key: SecretKey,
         node_tx: UnboundedSender<Vec<NodeRecord>>,
     ) -> Self {
-        let db = PeerDB::new().await;
+        let db = AwsPeerDB::new().await;
         UpdateListener {
             discv4,
             dnsdisc,
@@ -42,7 +42,7 @@ impl UpdateListener {
         while let Some(update) = discv4_stream.next().await {
             let captured_discv4 = self.discv4.clone();
             let node_tx = self.node_tx.clone();
-            let db: PeerDB = self.db.clone();
+            let db = self.db.clone();
             if let DiscoveryUpdate::Added(peer) | DiscoveryUpdate::DiscoveredAtCapacity(peer) =
                 update
             {
@@ -127,7 +127,7 @@ impl UpdateListener {
         let mut dnsdisc_update_stream = self.dnsdisc.node_record_stream().await?;
         let key = self.key;
         while let Some(update) = dnsdisc_update_stream.next().await {
-            let db: PeerDB = self.db.clone();
+            let db: AwsPeerDB = self.db.clone();
             let DnsNodeRecordUpdate {
                 node_record: peer,
                 fork_id,
