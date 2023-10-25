@@ -3,7 +3,7 @@ use chrono::Utc;
 use futures::StreamExt;
 use ipgeolocate::{Locator, Service};
 use once_cell::sync::Lazy;
-use reth_crawler_db::{save_peer, AwsPeerDB, InMemoryPeerDB, PeerDB, PeerData};
+use reth_crawler_db::{db::SqlPeerDB, save_peer, AwsPeerDB, InMemoryPeerDB, PeerDB, PeerData};
 use reth_discv4::{DiscoveryUpdate, Discv4};
 use reth_dns_discovery::{DnsDiscoveryHandle, DnsNodeRecordUpdate};
 use reth_primitives::{mainnet_nodes, NodeRecord};
@@ -26,15 +26,15 @@ impl UpdateListener {
         dnsdisc: DnsDiscoveryHandle,
         key: SecretKey,
         node_tx: UnboundedSender<Vec<NodeRecord>>,
-        in_memory_db: bool,
+        sql_db: bool,
     ) -> Self {
-        if in_memory_db {
+        if sql_db {
             UpdateListener {
                 discv4,
                 dnsdisc,
                 key,
                 node_tx,
-                db: Arc::new(InMemoryPeerDB::new()),
+                db: Arc::new(SqlPeerDB::new().await),
             }
         } else {
             UpdateListener {

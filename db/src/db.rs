@@ -7,6 +7,7 @@ use aws_sdk_dynamodb::types::{
 };
 use aws_sdk_dynamodb::{config::Region, meta::PKG_VERSION, Client, Error};
 use std::collections::HashMap;
+use std::path::Path;
 use std::sync::{Arc, RwLock};
 use tokio_rusqlite::Connection;
 use tokio_stream::StreamExt;
@@ -219,7 +220,7 @@ impl SqlPeerDB {
                 port INTEGER NOT NULL,
                 country TEXT,
                 city TEXT,
-                last_seen TEXT NOT NULL,
+                last_seen TEXT NOT NULL
             );",
                     [],
                 )

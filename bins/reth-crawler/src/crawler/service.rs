@@ -16,7 +16,7 @@ impl CrawlerService {
         discv4: Discv4,
         dnsdisc: DnsDiscoveryHandle,
         key: SecretKey,
-        in_memory_db: bool,
+        sql_db: bool,
     ) -> Self {
         let (tx, rx) = mpsc::unbounded_channel::<Vec<NodeRecord>>();
         let updates = UpdateListener::new(
@@ -24,7 +24,7 @@ impl CrawlerService {
             dnsdisc.clone(),
             key,
             tx.clone(),
-            in_memory_db,
+            sql_db,
         )
         .await;
         Self { updates }

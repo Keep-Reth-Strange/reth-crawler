@@ -12,7 +12,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app = Router::new()
         .route("/", routing::get(handler))
         .merge(rest_router())
-        .with_state(AppState::new().await);
+        .with_state(AppState::new_sql().await);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3030));
     info!("Server started, listening on {addr}");
