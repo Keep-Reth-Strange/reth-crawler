@@ -38,3 +38,6 @@ secp256k1 = { version = "0.27.0", default-features = false, features = [
 # aws
 aws-config = { version = "0.56.1" }
 aws-sdk-dynamodb = { version = "0.33.0" }
+
+# sqlite
+tokio-rusqlite = "0.4.0"

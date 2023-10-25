@@ -11,6 +11,9 @@ reth-primitives.workspace = true
 aws-config.workspace = true
 aws-sdk-dynamodb.workspace = true
 
+#sqlite
+tokio-rusqlite.workspace = true
+
 # general
 async-trait.workspace = true
 thiserror.workspace = true

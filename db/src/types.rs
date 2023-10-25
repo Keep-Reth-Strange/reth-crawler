@@ -135,6 +135,8 @@ pub enum AddItemError {
     AwsAddItemError(#[from] SdkError<PutItemError>),
     #[error("An error occurred adding a new item into the in memory db")]
     InMemoryDbAddItemError(),
+    #[error("An error occurred adding a new item into the SQL database: {0}")]
+    SqlAddItemError(#[from] tokio_rusqlite::Error),
 }
 
 #[derive(Debug, Error)]
@@ -143,6 +145,8 @@ pub enum ScanTableError {
     AwsScanError(#[from] SdkError<ScanError>),
     #[error("An error occurred while performing a scan of the in memory database")]
     InMemoryDbScanError(),
+    #[error("An error occurred while performing a scan of the SQL database: {0}")]
+    SqlScanError(#[from] tokio_rusqlite::Error),
 }
 
 #[derive(Debug, Error)]
@@ -151,4 +155,6 @@ pub enum QueryItemError {
     AwsQueryItemError(#[from] SdkError<QueryError>),
     #[error("An error occurred querying the in memory database")]
     InMemoryDbQueryItemError(),
+    #[error("An error occurred querying the SQL database: {0}")]
+    SqlQueryItemError(#[from] tokio_rusqlite::Error),
 }

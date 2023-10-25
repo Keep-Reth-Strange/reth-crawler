@@ -8,6 +8,7 @@ use aws_sdk_dynamodb::types::{
 use aws_sdk_dynamodb::{config::Region, meta::PKG_VERSION, Client, Error};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
+use tokio_rusqlite::Connection;
 use tokio_stream::StreamExt;
 
 #[async_trait]
@@ -196,5 +197,157 @@ impl PeerDB for InMemoryPeerDB {
                 .map(|(_, peer_data)| peer_data.clone())
                 .collect(),
         ))
+    }
+}
+
+pub struct SqlPeerDB {
+    db: Connection,
+}
+
+impl SqlPeerDB {
+    pub async fn new() -> Self {
+        let db = Connection::open("peers_data.db").await.unwrap();
+        // create `eth_peer_data` table if not exists
+        let _ = db
+            .call(|conn| {
+                conn.execute(
+                    "CREATE TABLE IF NOT EXISTS eth_peer_data (
+                id TEXT PRIMARY KEY,
+                ip TEXT NOT NULL,
+                client_version TEXT NOT NULL,
+                enode_url TEXT NOT NULL,
+                port INTEGER NOT NULL,
+                country TEXT,
+                city TEXT,
+                last_seen TEXT NOT NULL,
+            );",
+                    [],
+                )
+            })
+            .await
+            .unwrap();
+        Self { db }
+    }
+}
+
+#[async_trait]
+impl PeerDB for SqlPeerDB {
+    async fn add_peer(&self, peer_data: PeerData) -> Result<(), AddItemError> {
+        self.db
+            .call(move |conn| {
+                conn.execute(
+                    "INSERT INTO eth_peer_data VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                    (
+                        &peer_data.id,
+                        &peer_data.address,
+                        &peer_data.client_version,
+                        &peer_data.enode_url,
+                        &peer_data.tcp_port,
+                        &peer_data.country,
+                        &peer_data.city,
+                        &peer_data.last_seen,
+                    ),
+                )
+            })
+            .await
+            .map_err(|err| AddItemError::SqlAddItemError(err))?;
+        Ok(())
+    }
+
+    async fn all_peers(&self, page_size: Option<i32>) -> Result<Vec<PeerData>, ScanTableError> {
+        let page_size = page_size.unwrap_or(50);
+        let peers = self
+            .db
+            .call(move |conn| {
+                let mut stmt = conn.prepare("SELECT * from eth_peer_data LIMIT ?1")?;
+                let rows = stmt.query_map([page_size], |row| {
+                    Ok(PeerData {
+                        id: row.get(0)?,
+                        address: row.get(1)?,
+                        client_version: row.get(2)?,
+                        enode_url: row.get(3)?,
+                        tcp_port: row.get(4)?,
+                        country: row.get(5)?,
+                        city: row.get(6)?,
+                        last_seen: row.get(7)?,
+                        capabilities: vec![], // TODO: right now we don't save capabilities into the db
+                    })
+                })?;
+                let mut peers = vec![];
+                for row in rows {
+                    if let Ok(peer_data) = row {
+                        peers.push(peer_data);
+                    }
+                }
+                Ok(peers)
+            })
+            .await
+            .map_err(|err| ScanTableError::SqlScanError(err))?;
+
+        Ok(peers)
+    }
+
+    async fn node_by_id(&self, id: String) -> Result<Option<Vec<PeerData>>, QueryItemError> {
+        let peers = self
+            .db
+            .call(move |conn| {
+                let mut stmt = conn.prepare("SELECT * from eth_peer_data WHERE id = ?1")?;
+                let rows = stmt.query_map([id], |row| {
+                    Ok(PeerData {
+                        id: row.get(0)?,
+                        address: row.get(1)?,
+                        client_version: row.get(2)?,
+                        enode_url: row.get(3)?,
+                        tcp_port: row.get(4)?,
+                        country: row.get(5)?,
+                        city: row.get(6)?,
+                        last_seen: row.get(7)?,
+                        capabilities: vec![], // TODO: right now we don't save capabilities into the db
+                    })
+                })?;
+                let mut peers = vec![];
+                for row in rows {
+                    if let Ok(peer_data) = row {
+                        peers.push(peer_data);
+                    }
+                }
+                Ok(peers)
+            })
+            .await
+            .map_err(|err| QueryItemError::SqlQueryItemError(err))?;
+
+        Ok(Some(peers))
+    }
+
+    async fn node_by_ip(&self, ip: String) -> Result<Option<Vec<PeerData>>, QueryItemError> {
+        let peers = self
+            .db
+            .call(move |conn| {
+                let mut stmt = conn.prepare("SELECT * from eth_peer_data WHERE ip = ?1")?;
+                let rows = stmt.query_map([ip], |row| {
+                    Ok(PeerData {
+                        id: row.get(0)?,
+                        address: row.get(1)?,
+                        client_version: row.get(2)?,
+                        enode_url: row.get(3)?,
+                        tcp_port: row.get(4)?,
+                        country: row.get(5)?,
+                        city: row.get(6)?,
+                        last_seen: row.get(7)?,
+                        capabilities: vec![], // TODO: right now we don't save capabilities into the db
+                    })
+                })?;
+                let mut peers = vec![];
+                for row in rows {
+                    if let Ok(peer_data) = row {
+                        peers.push(peer_data);
+                    }
+                }
+                Ok(peers)
+            })
+            .await
+            .map_err(|err| QueryItemError::SqlQueryItemError(err))?;
+
+        Ok(Some(peers))
     }
 }
