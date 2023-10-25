@@ -1,9 +1,9 @@
-mod dynamodb;
+mod peerdb;
 
 use axum::routing;
 use axum::Json;
 use axum::Router;
-use dynamodb::{rest_router, AppState};
+use peerdb::{rest_router, AppState};
 use std::net::SocketAddr;
 use tracing::info;
 

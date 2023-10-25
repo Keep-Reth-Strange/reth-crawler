@@ -237,7 +237,7 @@ impl PeerDB for SqlPeerDB {
         self.db
             .call(move |conn| {
                 conn.execute(
-                    "INSERT INTO eth_peer_data VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                    "INSERT OR REPLACE INTO eth_peer_data (id, ip, client_version, enode_url, port, country, city, last_seen) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
                     (
                         &peer_data.id,
                         &peer_data.address,
