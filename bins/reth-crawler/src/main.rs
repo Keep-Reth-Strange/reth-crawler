@@ -1,7 +1,11 @@
+mod api_server;
 mod crawler;
 mod p2p;
+
+use api_server::start_api_server;
 use clap::{Args, Parser, Subcommand};
 use crawler::CrawlerFactory;
+use tokio::join;
 
 #[derive(Parser)]
 #[command(author, version)]
@@ -40,12 +44,16 @@ async fn main() {
 
     match &cli.command {
         Commands::Crawl(opts) => {
-            let (_, _) = CrawlerFactory::new()
-                .await
-                .make(opts.sql_db)
-                .await
-                .run(opts.save_to_json)
-                .await;
+            let crawler_future = async {
+                CrawlerFactory::new()
+                    .await
+                    .make(opts.sql_db)
+                    .await
+                    .run(opts.save_to_json)
+                    .await
+            };
+            let api_server_future = async { start_api_server(opts.sql_db).await };
+            let (_, _) = join!(crawler_future, api_server_future);
         }
     }
 }

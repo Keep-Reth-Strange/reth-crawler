@@ -4303,6 +4303,7 @@ dependencies = [
 name = "reth-crawler"
 version = "0.1.0"
 dependencies = [
+ "axum",
  "chrono",
  "clap",
  "console-subscriber",
@@ -4323,20 +4324,6 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
-]
-
-[[package]]
-name = "reth-crawler-api-server"
-version = "0.1.0"
-dependencies = [
- "aws-config",
- "aws-sdk-dynamodb",
- "axum",
- "reth-crawler-db",
- "serde",
- "tokio",
- "tokio-stream",
- "tracing",
 ]
 
 [[package]]
