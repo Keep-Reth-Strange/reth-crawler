@@ -218,6 +218,10 @@ impl SqlPeerDB {
                 client_version TEXT NOT NULL,
                 enode_url TEXT NOT NULL,
                 port INTEGER NOT NULL,
+                chain TEXT NOT NULL,
+                genesis_hash TEXT NOT NULL,
+                best_block TEXT NOT NULL,
+                total_difficulty TEXT NOT NULL,
                 country TEXT,
                 city TEXT,
                 last_seen TEXT NOT NULL
@@ -237,13 +241,17 @@ impl PeerDB for SqlPeerDB {
         self.db
             .call(move |conn| {
                 conn.execute(
-                    "INSERT OR REPLACE INTO eth_peer_data (id, ip, client_version, enode_url, port, country, city, last_seen) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                    "INSERT OR REPLACE INTO eth_peer_data (id, ip, client_version, enode_url, port, chain, genesis_hash, best_block, total_difficulty, country, city, last_seen) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
                     (
                         &peer_data.id,
                         &peer_data.address,
                         &peer_data.client_version,
                         &peer_data.enode_url,
                         &peer_data.tcp_port,
+                        &peer_data.chain,
+                        &peer_data.genesis_block_hash,
+                        &peer_data.best_block,
+                        &peer_data.total_difficulty,
                         &peer_data.country,
                         &peer_data.city,
                         &peer_data.last_seen,
@@ -268,10 +276,15 @@ impl PeerDB for SqlPeerDB {
                         client_version: row.get(2)?,
                         enode_url: row.get(3)?,
                         tcp_port: row.get(4)?,
-                        country: row.get(5)?,
-                        city: row.get(6)?,
-                        last_seen: row.get(7)?,
+                        chain: row.get(5)?,
+                        genesis_block_hash: row.get(6)?,
+                        best_block: row.get(7)?,
+                        total_difficulty: row.get(8)?,
+                        country: row.get(9)?,
+                        city: row.get(10)?,
+                        last_seen: row.get(11)?,
                         capabilities: vec![], // TODO: right now we don't save capabilities into the db
+                        eth_version: 0, // TODO: right now we don't save eth_version into the db
                     })
                 })?;
                 let mut peers = vec![];
@@ -300,10 +313,15 @@ impl PeerDB for SqlPeerDB {
                         client_version: row.get(2)?,
                         enode_url: row.get(3)?,
                         tcp_port: row.get(4)?,
-                        country: row.get(5)?,
-                        city: row.get(6)?,
-                        last_seen: row.get(7)?,
+                        chain: row.get(5)?,
+                        genesis_block_hash: row.get(6)?,
+                        best_block: row.get(7)?,
+                        total_difficulty: row.get(8)?,
+                        country: row.get(9)?,
+                        city: row.get(10)?,
+                        last_seen: row.get(11)?,
                         capabilities: vec![], // TODO: right now we don't save capabilities into the db
+                        eth_version: 0, // TODO: right now we don't save eth_version into the db
                     })
                 })?;
                 let mut peers = vec![];
@@ -332,10 +350,15 @@ impl PeerDB for SqlPeerDB {
                         client_version: row.get(2)?,
                         enode_url: row.get(3)?,
                         tcp_port: row.get(4)?,
-                        country: row.get(5)?,
-                        city: row.get(6)?,
-                        last_seen: row.get(7)?,
+                        chain: row.get(5)?,
+                        genesis_block_hash: row.get(6)?,
+                        best_block: row.get(7)?,
+                        total_difficulty: row.get(8)?,
+                        country: row.get(9)?,
+                        city: row.get(10)?,
+                        last_seen: row.get(11)?,
                         capabilities: vec![], // TODO: right now we don't save capabilities into the db
+                        eth_version: 0, // TODO: right now we don't save eth_version into the db
                     })
                 })?;
                 let mut peers = vec![];
