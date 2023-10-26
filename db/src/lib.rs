@@ -5,7 +5,7 @@ use std::sync::Arc;
 use tokio::{fs::OpenOptions, io::AsyncWriteExt};
 
 // Re-exports
-pub use db::{AwsPeerDB, InMemoryPeerDB, PeerDB};
+pub use db::{AwsPeerDB, InMemoryPeerDB, PeerDB, SqlPeerDB};
 use tracing::error;
 pub use types::PeerData;
 

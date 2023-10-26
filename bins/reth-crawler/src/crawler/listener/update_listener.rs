@@ -3,7 +3,7 @@ use chrono::Utc;
 use futures::StreamExt;
 use ipgeolocate::{Locator, Service};
 use once_cell::sync::Lazy;
-use reth_crawler_db::{db::SqlPeerDB, save_peer, AwsPeerDB, InMemoryPeerDB, PeerDB, PeerData};
+use reth_crawler_db::{save_peer, AwsPeerDB, PeerDB, PeerData, SqlPeerDB};
 use reth_discv4::{DiscoveryUpdate, Discv4};
 use reth_dns_discovery::{DnsDiscoveryHandle, DnsNodeRecordUpdate};
 use reth_primitives::{mainnet_nodes, NodeRecord};

@@ -1,13 +1,9 @@
 use crate::types::{AddItemError, PeerData, QueryItemError, ScanTableError};
 use async_trait::async_trait;
 use aws_config::meta::region::RegionProviderChain;
-use aws_sdk_dynamodb::types::{
-    AttributeDefinition, AttributeValue, KeySchemaElement, KeyType, ProvisionedThroughput,
-    ScalarAttributeType, Select, TableStatus,
-};
-use aws_sdk_dynamodb::{config::Region, meta::PKG_VERSION, Client, Error};
+use aws_sdk_dynamodb::types::AttributeValue;
+use aws_sdk_dynamodb::{config::Region, Client};
 use std::collections::HashMap;
-use std::path::Path;
 use std::sync::{Arc, RwLock};
 use tokio_rusqlite::Connection;
 use tokio_stream::StreamExt;
