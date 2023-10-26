@@ -1,4 +1,4 @@
-use crate::p2p::handshake_p2p;
+use crate::p2p::{handshake_eth, handshake_p2p};
 use chrono::Utc;
 use futures::StreamExt;
 use ipgeolocate::{Locator, Service};
@@ -43,7 +43,9 @@ impl UpdateListener {
             let captured_discv4 = self.discv4.clone();
             let node_tx = self.node_tx.clone();
             let db: PeerDB = self.db.clone();
-            if let DiscoveryUpdate::Added(peer) = update {
+            if let DiscoveryUpdate::Added(peer) | DiscoveryUpdate::DiscoveredAtCapacity(peer) =
+                update
+            {
                 tokio::spawn(async move {
                     let (p2p_stream, their_hello) = match handshake_p2p(peer, key).await {
                         Ok(s) => s,
@@ -52,14 +54,14 @@ impl UpdateListener {
                             return;
                         }
                     };
-                    /*/
+
                     let (eth_stream, their_status) = match handshake_eth(p2p_stream).await {
                         Ok(s) => s,
                         Err(e) => {
                             info!("Failed ETH handshake with peer {}, {}", peer.address, e);
                             return;
                         }
-                    }; */
+                    };
 
                     let last_seen = Utc::now().to_string();
 
@@ -91,11 +93,11 @@ impl UpdateListener {
                         .map(|cap| cap.to_string())
                         .collect();
 
-                    //let chain = their_status.chain.to_string();
+                    let chain = their_status.chain.to_string();
 
-                    //let total_difficulty = their_status.total_difficulty;
-                    //let best_block = their_status.blockhash;
-                    //let genesis_block_hash = their_status.genesis;
+                    let total_difficulty = their_status.total_difficulty.to_string();
+                    let best_block = their_status.blockhash.to_string();
+                    let genesis_block_hash = their_status.genesis.to_string();
 
                     // collect data into `PeerData`
                     let peer_data = PeerData {
@@ -104,12 +106,12 @@ impl UpdateListener {
                         address: ip_addr,
                         tcp_port: peer.tcp_port,
                         client_version: their_hello.client_version.clone(),
-                        //eth_version: their_status.version,
+                        eth_version: their_status.version,
                         capabilities,
-                        //total_difficulty,
-                        //chain,
-                        //best_block,
-                        //genesis_block_hash,
+                        total_difficulty,
+                        chain,
+                        best_block,
+                        genesis_block_hash,
                         last_seen,
                         country,
                         city,
@@ -130,7 +132,6 @@ impl UpdateListener {
                 node_record: peer,
                 fork_id,
             } = update;
-            let captured_discv4 = self.discv4.clone();
             tokio::spawn(async move {
                 let (p2p_stream, their_hello) = match handshake_p2p(peer, key).await {
                     Ok(s) => s,
@@ -139,14 +140,14 @@ impl UpdateListener {
                         return;
                     }
                 };
-                /*
+
                 let (_eth_stream, their_status) = match handshake_eth(p2p_stream).await {
                     Ok(s) => s,
                     Err(e) => {
                         info!("Failed ETH handshake with peer {}, {}", peer.address, e);
                         return;
                     }
-                }; */
+                };
 
                 let last_seen = Utc::now().to_string();
 
@@ -177,11 +178,11 @@ impl UpdateListener {
                     .map(|cap| cap.to_string())
                     .collect();
 
-                //let chain = their_status.chain.to_string();
+                let chain = their_status.chain.to_string();
 
-                //let total_difficulty = their_status.total_difficulty;
-                //let best_block = their_status.blockhash;
-                // let genesis_block_hash = their_status.genesis;
+                let total_difficulty = their_status.total_difficulty.to_string();
+                let best_block = their_status.blockhash.to_string();
+                let genesis_block_hash = their_status.genesis.to_string();
 
                 // collect data into `PeerData`
                 let peer_data = PeerData {
@@ -190,12 +191,12 @@ impl UpdateListener {
                     address: ip_addr,
                     tcp_port: peer.tcp_port,
                     client_version: their_hello.client_version.clone(),
-                    // eth_version: their_hello.protocol_version,
+                    eth_version: their_status.version,
                     capabilities,
-                    //total_difficulty,
-                    //chain,
-                    //best_block,
-                    //genesis_block_hash,
+                    total_difficulty,
+                    chain,
+                    best_block,
+                    genesis_block_hash,
                     last_seen,
                     country,
                     city,

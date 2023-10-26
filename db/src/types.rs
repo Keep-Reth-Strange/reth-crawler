@@ -11,12 +11,12 @@ pub struct PeerData {
     pub address: String,
     pub tcp_port: u16,
     pub client_version: String,
-    // pub eth_version: u8,
+    pub eth_version: u8,
     pub capabilities: Vec<String>,
-    //pub chain: String,
-    //pub total_difficulty: U256,
-    //pub best_block: H256, // TODO: convert this to a blocknum with a lookup
-    //pub genesis_block_hash: H256,
+    pub chain: String,
+    pub total_difficulty: String,
+    pub best_block: String, // TODO: convert this to a blocknum with a lookup
+    pub genesis_block_hash: String,
     pub last_seen: String,
     pub country: String,
     pub city: String,
@@ -33,6 +33,11 @@ impl PeerData {
         last_seen: String,
         country: String,
         city: String,
+        genesis_block_hash: String,
+        best_block: String,
+        total_difficulty: String,
+        chain: String,
+        eth_version: u8,
     ) -> Self {
         Self {
             enode_url,
@@ -44,6 +49,11 @@ impl PeerData {
             last_seen,
             country,
             city,
+            total_difficulty: total_difficulty,
+            chain,
+            best_block: best_block,
+            eth_version,
+            genesis_block_hash: genesis_block_hash,
         }
     }
 }
@@ -60,6 +70,11 @@ impl From<&HashMap<String, AttributeValue>> for PeerData {
             as_string(value.get("last_seen"), &"".to_string()),
             as_string(value.get("country"), &"".to_string()),
             as_string(value.get("city"), &"".to_string()),
+            as_string(value.get("genesis_block_hash"), &"".to_string()),
+            as_string(value.get("best_block"), &"".to_string()),
+            as_string(value.get("total_difficulty"), &"".to_string()),
+            as_string(value.get("chain"), &"".to_string()),
+            as_u8(value.get("eth_version"), 0),
         );
 
         peer_data
@@ -79,6 +94,17 @@ pub fn as_u16(val: Option<&AttributeValue>, default: u16) -> u16 {
     if let Some(v) = val {
         if let Ok(n) = v.as_n() {
             if let Ok(n) = n.parse::<u16>() {
+                return n;
+            }
+        }
+    }
+    default
+}
+
+pub fn as_u8(val: Option<&AttributeValue>, default: u8) -> u8 {
+    if let Some(v) = val {
+        if let Ok(n) = v.as_n() {
+            if let Ok(n) = n.parse::<u8>() {
                 return n;
             }
         }

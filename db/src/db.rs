@@ -32,7 +32,10 @@ impl PeerDB {
         let client_version = AttributeValue::S(peer_data.client_version);
         let enode_url = AttributeValue::S(peer_data.enode_url);
         let port = AttributeValue::N(peer_data.tcp_port.to_string()); // numbers are sent over the network as string
-                                                                      // let chain = AttributeValue::S(peer_data.chain);
+        let chain = AttributeValue::S(peer_data.chain);
+        let genesis_hash = AttributeValue::S(peer_data.genesis_block_hash);
+        let best_block = AttributeValue::S(peer_data.best_block);
+        let total_difficulty = AttributeValue::S(peer_data.total_difficulty);
         let country = AttributeValue::S(peer_data.country);
         let city = AttributeValue::S(peer_data.city);
         let last_seen = AttributeValue::S(peer_data.last_seen);
@@ -47,11 +50,14 @@ impl PeerDB {
             .item("client_version", client_version)
             .item("enode_url", enode_url)
             .item("port", port)
-            // .item("chain", chain)
+            .item("chain", chain)
             .item("country", country)
             .item("city", city)
             .item("last_seen", last_seen)
             .item("source_region", region_source)
+            .item("genesis_block_hash", genesis_hash)
+            .item("best_block", best_block)
+            .item("total_difficulty", total_difficulty)
             .send()
             .await
         {
