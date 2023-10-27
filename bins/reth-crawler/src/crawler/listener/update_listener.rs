@@ -1,12 +1,14 @@
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
+
 use crate::p2p::{handshake_eth, handshake_p2p};
 use chrono::Utc;
 use futures::StreamExt;
 use ipgeolocate::{Locator, Service};
-use once_cell::sync::Lazy;
 use reth_crawler_db::{save_peer, PeerDB, PeerData};
 use reth_discv4::{DiscoveryUpdate, Discv4};
 use reth_dns_discovery::{DnsDiscoveryHandle, DnsNodeRecordUpdate};
-use reth_primitives::{mainnet_nodes, NodeRecord};
+use reth_primitives::{NodeRecord, PeerId};
 use secp256k1::SecretKey;
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::info;
@@ -15,9 +17,11 @@ pub struct UpdateListener {
     discv4: Discv4,
     dnsdisc: DnsDiscoveryHandle,
     key: SecretKey,
-    node_tx: UnboundedSender<Vec<NodeRecord>>,
     db: PeerDB,
+    p2p_failures: Arc<RwLock<HashMap<PeerId, u64>>>,
 }
+
+const P2P_FAILURE_THRESHOLD: u8 = 5;
 
 impl UpdateListener {
     pub async fn new(
@@ -27,12 +31,13 @@ impl UpdateListener {
         node_tx: UnboundedSender<Vec<NodeRecord>>,
     ) -> Self {
         let db = PeerDB::new().await;
+        let p2p_failures = Arc::from(RwLock::from(HashMap::new()));
         UpdateListener {
             discv4,
             dnsdisc,
             key,
-            node_tx,
             db,
+            p2p_failures,
         }
     }
 
@@ -40,17 +45,51 @@ impl UpdateListener {
         let mut discv4_stream = self.discv4.update_stream().await?;
         let key = self.key;
         while let Some(update) = discv4_stream.next().await {
-            let captured_discv4 = self.discv4.clone();
-            let node_tx = self.node_tx.clone();
             let db: PeerDB = self.db.clone();
+            let captured_discv4 = self.discv4.clone();
+            let p2p_failures = self.p2p_failures.clone();
             if let DiscoveryUpdate::Added(peer) | DiscoveryUpdate::DiscoveredAtCapacity(peer) =
                 update
             {
                 tokio::spawn(async move {
+                    // kick a forced lookup
+                    let _ = captured_discv4.lookup(peer.id).await;
+                    let mut p2p_failure_count: u64;
+                    {
+                        let rlock = p2p_failures.read().unwrap();
+                        p2p_failure_count = *rlock.get(&peer.id).unwrap_or(&0);
+                    }
                     let (p2p_stream, their_hello) = match handshake_p2p(peer, key).await {
                         Ok(s) => s,
                         Err(e) => {
                             info!("Failed P2P handshake with peer {}, {}", peer.address, e);
+                            if e.to_string().contains("Too many peers") {
+                                info!("Skip counting p2p_failure for peer: {}", peer.address);
+                                return;
+                            }
+                            p2p_failure_count = p2p_failure_count + 1;
+                            if p2p_failure_count >= P2P_FAILURE_THRESHOLD as u64 {
+                                // ban this peer - TODO: we probably want Discv4Service::ban_until() semantics here, but that isn't exposed to us
+                                // for now - permaban
+                                info!(
+                                    "PeerId {} has failed p2p handshake {} times, banning",
+                                    peer.id, p2p_failure_count
+                                );
+                                captured_discv4.ban_ip(peer.address);
+                                // scope guard to drop wlock
+                                {
+                                    // reset count to 0 since we've now banned
+                                    let mut wlock = p2p_failures.write().unwrap();
+                                    wlock.insert(peer.id, 0);
+                                }
+                                return;
+                            }
+                            // scope guard to drop wlock
+                            {
+                                // increment failure count
+                                let mut wlock = p2p_failures.write().unwrap();
+                                wlock.insert(peer.id, p2p_failure_count);
+                            }
                             return;
                         }
                     };
@@ -59,10 +98,21 @@ impl UpdateListener {
                         Ok(s) => s,
                         Err(e) => {
                             info!("Failed ETH handshake with peer {}, {}", peer.address, e);
+                            // ban the peer permanently - we never want to process another disc packet for this again since we know its not on the same network
+                            captured_discv4.ban_ip(peer.address);
                             return;
                         }
                     };
 
+                    if their_hello.client_version.is_empty() {
+                        info!(
+                            "Peer {} with empty client_version - returning",
+                            peer.address
+                        );
+                        // ban their IP - since our results show that we have multiple PeerIDs with multiple IPs and no ClientVersion
+                        captured_discv4.ban_ip(peer.address);
+                        return;
+                    }
                     let last_seen = Utc::now().to_string();
 
                     info!(
@@ -128,15 +178,51 @@ impl UpdateListener {
         let key = self.key;
         while let Some(update) = dnsdisc_update_stream.next().await {
             let db: PeerDB = self.db.clone();
+            let p2p_failures = self.p2p_failures.clone();
+            let captured_discv4 = self.discv4.clone();
             let DnsNodeRecordUpdate {
                 node_record: peer,
                 fork_id,
             } = update;
             tokio::spawn(async move {
+                // kick a forced lookup
+                let _ = captured_discv4.lookup(peer.id).await;
+                let mut p2p_failure_count: u64;
+                {
+                    let rlock = p2p_failures.read().unwrap();
+                    p2p_failure_count = *rlock.get(&peer.id).unwrap_or(&0);
+                }
                 let (p2p_stream, their_hello) = match handshake_p2p(peer, key).await {
                     Ok(s) => s,
                     Err(e) => {
                         info!("Failed P2P handshake with peer {}, {}", peer.address, e);
+                        if e.to_string().contains("Too many peers") {
+                            info!("Skip counting p2p_failure for peer: {}", peer.address);
+                            return;
+                        }
+                        p2p_failure_count = p2p_failure_count + 1;
+                        if p2p_failure_count >= P2P_FAILURE_THRESHOLD as u64 {
+                            // ban this peer - TODO: we probably want Discv4Service::ban_until() semantics here, but that isn't exposed to us
+                            // for now - permaban
+                            info!(
+                                "PeerId {} has failed p2p handshake {} times, banning",
+                                peer.id, p2p_failure_count
+                            );
+                            captured_discv4.ban_ip(peer.address);
+                            // scope guard to drop wlock
+                            {
+                                // reset count to 0 since we've now banned
+                                let mut wlock = p2p_failures.write().unwrap();
+                                wlock.insert(peer.id, 0);
+                            }
+                            return;
+                        }
+                        // scope guard to drop wlock
+                        {
+                            // increment failure count
+                            let mut wlock = p2p_failures.write().unwrap();
+                            wlock.insert(peer.id, p2p_failure_count);
+                        }
                         return;
                     }
                 };
@@ -145,10 +231,20 @@ impl UpdateListener {
                     Ok(s) => s,
                     Err(e) => {
                         info!("Failed ETH handshake with peer {}, {}", peer.address, e);
+                        // ban the peer permanently - we never want to process another disc packet for this again since we know its not on the same network
+                        captured_discv4.ban_ip(peer.address);
                         return;
                     }
                 };
-
+                if their_hello.client_version.is_empty() {
+                    info!(
+                        "Peer {} with empty client_version - returning",
+                        peer.address
+                    );
+                    // ban their IP - since our results show that we have multiple PeerIDs with multiple IPs and no ClientVersion
+                    captured_discv4.ban_ip(peer.address);
+                    return;
+                }
                 let last_seen = Utc::now().to_string();
 
                 info!(
