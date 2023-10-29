@@ -107,13 +107,12 @@ impl UpdateListener {
                             return;
                         }
                     };
-
                     if their_hello.client_version.is_empty() {
                         info!(
                             "Peer {} with empty client_version - returning",
                             peer.address
                         );
-                        // ban their IP - since our results show that we have multiple PeerIDs with multiple IPs and no ClientVersion
+                        // ban their IP - since our results show that we have multiple PeerIDs with the same IPs and no ClientVersion
                         captured_discv4.ban_ip(peer.address);
                         return;
                     }
@@ -244,7 +243,7 @@ impl UpdateListener {
                         "Peer {} with empty client_version - returning",
                         peer.address
                     );
-                    // ban their IP - since our results show that we have multiple PeerIDs with multiple IPs and no ClientVersion
+                    // ban their IP - since our results show that we have multiple PeerIDs with the same IP and no ClientVersion
                     captured_discv4.ban_ip(peer.address);
                     return;
                 }
@@ -355,6 +354,12 @@ impl UpdateListener {
                             Err(_) => {
                                 // leave `country` and `city` empty if not able to get them
                             }
+                        }
+                        // these peers inflate our numbers, same IP multiple generated ID
+                        // TODO: ban them, but this isn't controlled by disc, and ban_ip semantics don't seem public to peers/network handles (?) - maybe peer_handle::reputation_change
+                        if client_version.is_empty() {
+                            debug!("Peer {} with empty client_version - returning", ip_addr);
+                            return;
                         }
 
                         let peer_data = PeerData {
