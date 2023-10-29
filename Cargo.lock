@@ -4286,6 +4286,7 @@ dependencies = [
  "reth-eth-wire",
  "reth-network",
  "reth-primitives",
+ "reth-provider",
  "secp256k1 0.27.0",
  "serde",
  "serde_json",
@@ -4674,6 +4675,7 @@ name = "reth-provider"
 version = "0.1.0-alpha.10"
 source = "git+https://github.com/0xprames/reth.git?branch=discv4-recv-preempt#6844a95efd9e86ee9dd197377a431ade87bd5426"
 dependencies = [
+ "alloy-rlp",
  "auto_impl",
  "itertools 0.11.0",
  "parking_lot 0.12.1",

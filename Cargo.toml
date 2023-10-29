@@ -11,6 +11,7 @@ reth-discv4 = { git = "https://github.com/0xprames/reth.git", branch = "discv4-r
 reth-dns-discovery = { git = "https://github.com/0xprames/reth.git", branch = "discv4-recv-preempt" }
 reth-eth-wire = { git = "https://github.com/0xprames/reth.git", branch = "discv4-recv-preempt" }
 reth-ecies = { git = "https://github.com/0xprames/reth.git", branch = "discv4-recv-preempt" }
+reth-provider = { git = "https://github.com/0xprames/reth.git", branch = "discv4-recv-preempt", features = ["test-utils"] }
 
 # serialization
 serde_json = "1.0"

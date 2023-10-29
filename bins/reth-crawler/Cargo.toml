@@ -15,6 +15,7 @@ reth-discv4.workspace = true
 reth-dns-discovery.workspace = true
 reth-eth-wire.workspace = true
 reth-ecies.workspace = true
+reth-provider.workspace = true
 
 # Serialization
 serde_json.workspace = true
