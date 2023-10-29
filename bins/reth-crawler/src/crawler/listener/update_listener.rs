@@ -8,14 +8,16 @@ use ipgeolocate::{Locator, Service};
 use reth_crawler_db::{save_peer, PeerDB, PeerData};
 use reth_discv4::{DiscoveryUpdate, Discv4};
 use reth_dns_discovery::{DnsDiscoveryHandle, DnsNodeRecordUpdate};
+use reth_network::{NetworkEvent, NetworkHandle};
 use reth_primitives::{NodeRecord, PeerId};
 use secp256k1::SecretKey;
 use tokio::sync::mpsc::UnboundedSender;
-use tracing::info;
+use tracing::{debug, info};
 
 pub struct UpdateListener {
     discv4: Discv4,
     dnsdisc: DnsDiscoveryHandle,
+    network: NetworkHandle,
     key: SecretKey,
     db: PeerDB,
     p2p_failures: Arc<RwLock<HashMap<PeerId, u64>>>,
@@ -27,6 +29,7 @@ impl UpdateListener {
     pub async fn new(
         discv4: Discv4,
         dnsdisc: DnsDiscoveryHandle,
+        network: NetworkHandle,
         key: SecretKey,
         node_tx: UnboundedSender<Vec<NodeRecord>>,
     ) -> Self {
@@ -37,6 +40,7 @@ impl UpdateListener {
             dnsdisc,
             key,
             db,
+            network,
             p2p_failures,
         }
     }
@@ -53,7 +57,7 @@ impl UpdateListener {
             {
                 tokio::spawn(async move {
                     // kick a forced lookup
-                    let _ = captured_discv4.lookup(peer.id).await;
+                    captured_discv4.send_lookup(peer.id);
                     let mut p2p_failure_count: u64;
                     {
                         let rlock = p2p_failures.read().unwrap();
@@ -64,14 +68,14 @@ impl UpdateListener {
                         Err(e) => {
                             info!("Failed P2P handshake with peer {}, {}", peer.address, e);
                             if e.to_string().contains("Too many peers") {
-                                info!("Skip counting p2p_failure for peer: {}", peer.address);
+                                debug!("Skip counting p2p_failure for peer: {}", peer.address);
                                 return;
                             }
                             p2p_failure_count = p2p_failure_count + 1;
                             if p2p_failure_count >= P2P_FAILURE_THRESHOLD as u64 {
                                 // ban this peer - TODO: we probably want Discv4Service::ban_until() semantics here, but that isn't exposed to us
                                 // for now - permaban
-                                info!(
+                                debug!(
                                     "PeerId {} has failed p2p handshake {} times, banning",
                                     peer.id, p2p_failure_count
                                 );
@@ -94,7 +98,7 @@ impl UpdateListener {
                         }
                     };
 
-                    let (eth_stream, their_status) = match handshake_eth(p2p_stream).await {
+                    let (_, their_status) = match handshake_eth(p2p_stream).await {
                         Ok(s) => s,
                         Err(e) => {
                             info!("Failed ETH handshake with peer {}, {}", peer.address, e);
@@ -181,12 +185,11 @@ impl UpdateListener {
             let p2p_failures = self.p2p_failures.clone();
             let captured_discv4 = self.discv4.clone();
             let DnsNodeRecordUpdate {
-                node_record: peer,
-                fork_id,
+                node_record: peer, ..
             } = update;
             tokio::spawn(async move {
                 // kick a forced lookup
-                let _ = captured_discv4.lookup(peer.id).await;
+                captured_discv4.send_lookup(peer.id);
                 let mut p2p_failure_count: u64;
                 {
                     let rlock = p2p_failures.read().unwrap();
@@ -197,14 +200,14 @@ impl UpdateListener {
                     Err(e) => {
                         info!("Failed P2P handshake with peer {}, {}", peer.address, e);
                         if e.to_string().contains("Too many peers") {
-                            info!("Skip counting p2p_failure for peer: {}", peer.address);
+                            debug!("Skip counting p2p_failure for peer: {}", peer.address);
                             return;
                         }
                         p2p_failure_count = p2p_failure_count + 1;
                         if p2p_failure_count >= P2P_FAILURE_THRESHOLD as u64 {
                             // ban this peer - TODO: we probably want Discv4Service::ban_until() semantics here, but that isn't exposed to us
                             // for now - permaban
-                            info!(
+                            debug!(
                                 "PeerId {} has failed p2p handshake {} times, banning",
                                 peer.id, p2p_failure_count
                             );
@@ -237,7 +240,7 @@ impl UpdateListener {
                     }
                 };
                 if their_hello.client_version.is_empty() {
-                    info!(
+                    debug!(
                         "Peer {} with empty client_version - returning",
                         peer.address
                     );
@@ -301,5 +304,89 @@ impl UpdateListener {
             });
         }
         Ok(())
+    }
+
+    pub async fn start_network(&self, save_to_json: bool) {
+        let mut net_events = self.network.event_listener();
+
+        while let Some(event) = net_events.next().await {
+            match event {
+                NetworkEvent::SessionEstablished {
+                    peer_id,
+                    remote_addr,
+                    client_version,
+                    capabilities,
+                    status,
+                    version,
+                    ..
+                } => {
+                    info!(
+                        "Session Established with peer {}",
+                        remote_addr.ip().to_string()
+                    );
+                    let db = self.db.clone();
+                    let peer_handle = self.network.peers_handle().clone();
+                    tokio::spawn(async move {
+                        // immediately disconnect the peer since we don't need any data from it
+                        peer_handle.remove_peer(peer_id);
+                        let enode_url = NodeRecord::new(remote_addr.clone(), peer_id);
+                        let capabilities = capabilities
+                            .as_ref()
+                            .capabilities()
+                            .to_vec()
+                            .iter()
+                            .map(|cap| cap.to_string())
+                            .collect();
+                        let chain = status.chain.to_string();
+                        let total_difficulty = status.total_difficulty.to_string();
+                        let best_block = status.blockhash.to_string();
+                        let genesis_block_hash = status.genesis.to_string();
+                        let last_seen = Utc::now().to_string();
+                        let mut country = String::default();
+                        let mut city = String::default();
+                        let service = Service::IpApi;
+                        let ip_addr = remote_addr.ip().to_string();
+
+                        match Locator::get(&ip_addr, service).await {
+                            Ok(loc) => {
+                                country = loc.country;
+                                city = loc.city;
+                            }
+                            Err(_) => {
+                                // leave `country` and `city` empty if not able to get them
+                            }
+                        }
+
+                        let peer_data = PeerData {
+                            enode_url: enode_url.to_string(),
+                            id: peer_id.to_string(),
+                            tcp_port: remote_addr.port(),
+                            address: remote_addr.ip().to_string(),
+                            client_version: client_version.to_string(),
+                            capabilities,
+                            eth_version: u8::from(version),
+                            chain,
+                            total_difficulty,
+                            best_block,
+                            genesis_block_hash,
+                            last_seen,
+                            country,
+                            city,
+                        };
+                        save_peer(peer_data, save_to_json, db).await;
+                    });
+                }
+                NetworkEvent::PeerAdded(_) | NetworkEvent::PeerRemoved(_) => {}
+                NetworkEvent::SessionClosed { peer_id, reason } => {
+                    if let Some(reason) = reason {
+                        info!(
+                            "Session closed with peer {} for {}",
+                            peer_id.to_string(),
+                            reason
+                        )
+                    }
+                }
+            }
+        }
     }
 }
