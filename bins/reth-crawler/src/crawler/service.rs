@@ -18,9 +18,10 @@ impl CrawlerService {
         dnsdisc: DnsDiscoveryHandle,
         network: NetworkHandle,
         key: SecretKey,
+        sql_db: bool,
     ) -> Self {
         let (tx, rx) = mpsc::unbounded_channel::<Vec<NodeRecord>>();
-        let updates = UpdateListener::new(discv4, dnsdisc, network, key, tx).await;
+        let updates = UpdateListener::new(discv4, dnsdisc, network, key, tx, sql_db).await;
         Self { updates }
     }
 

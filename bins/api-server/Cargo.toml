@@ -9,6 +9,7 @@ aws-config.workspace = true
 aws-sdk-dynamodb.workspace = true
 
 # general
+clap.workspace = true
 axum = { version = "0.6.4", features = ["macros"] }
 tokio.workspace = true
 tokio-stream.workspace = true
