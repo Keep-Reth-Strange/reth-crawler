@@ -12,11 +12,16 @@ aws-config.workspace = true
 aws-sdk-dynamodb.workspace = true
 
 # general
+async-trait.workspace = true
 tokio.workspace = true
 tokio-stream.workspace = true
+thiserror.workspace = true
 eyre.workspace = true
 tracing.workspace = true
 
 # serialization
 serde_json.workspace = true
 serde.workspace = true
+
+# sqlite
+tokio-rusqlite.workspace = true

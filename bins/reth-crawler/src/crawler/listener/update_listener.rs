@@ -5,7 +5,7 @@ use crate::p2p::{handshake_eth, handshake_p2p};
 use chrono::Utc;
 use futures::StreamExt;
 use ipgeolocate::{Locator, Service};
-use reth_crawler_db::{save_peer, PeerDB, PeerData};
+use reth_crawler_db::{save_peer, AwsPeerDB, PeerDB, PeerData, SqlPeerDB};
 use reth_discv4::{DiscoveryUpdate, Discv4};
 use reth_dns_discovery::{DnsDiscoveryHandle, DnsNodeRecordUpdate};
 use reth_network::{NetworkEvent, NetworkHandle};
@@ -19,7 +19,7 @@ pub struct UpdateListener {
     dnsdisc: DnsDiscoveryHandle,
     network: NetworkHandle,
     key: SecretKey,
-    db: PeerDB,
+    db: Arc<dyn PeerDB>,
     p2p_failures: Arc<RwLock<HashMap<PeerId, u64>>>,
 }
 
@@ -32,16 +32,27 @@ impl UpdateListener {
         network: NetworkHandle,
         key: SecretKey,
         node_tx: UnboundedSender<Vec<NodeRecord>>,
+        sql_db: bool,
     ) -> Self {
-        let db = PeerDB::new().await;
         let p2p_failures = Arc::from(RwLock::from(HashMap::new()));
-        UpdateListener {
-            discv4,
-            dnsdisc,
-            key,
-            db,
-            network,
-            p2p_failures,
+        if sql_db {
+            UpdateListener {
+                discv4,
+                dnsdisc,
+                key,
+                db: Arc::new(SqlPeerDB::new().await),
+                network,
+                p2p_failures,
+            }
+        } else {
+            UpdateListener {
+                discv4,
+                dnsdisc,
+                key,
+                db: Arc::new(AwsPeerDB::new().await),
+                network,
+                p2p_failures,
+            }
         }
     }
 
@@ -49,7 +60,7 @@ impl UpdateListener {
         let mut discv4_stream = self.discv4.update_stream().await?;
         let key = self.key;
         while let Some(update) = discv4_stream.next().await {
-            let db: PeerDB = self.db.clone();
+            let db = self.db.clone();
             let captured_discv4 = self.discv4.clone();
             let p2p_failures = self.p2p_failures.clone();
             if let DiscoveryUpdate::Added(peer) | DiscoveryUpdate::DiscoveredAtCapacity(peer) =
@@ -180,7 +191,7 @@ impl UpdateListener {
         let mut dnsdisc_update_stream = self.dnsdisc.node_record_stream().await?;
         let key = self.key;
         while let Some(update) = dnsdisc_update_stream.next().await {
-            let db: PeerDB = self.db.clone();
+            let db = self.db.clone();
             let p2p_failures = self.p2p_failures.clone();
             let captured_discv4 = self.discv4.clone();
             let DnsNodeRecordUpdate {
