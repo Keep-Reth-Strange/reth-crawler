@@ -4324,6 +4324,7 @@ dependencies = [
  "aws-config",
  "aws-sdk-dynamodb",
  "axum",
+ "chrono",
  "clap",
  "reth-crawler-db",
  "serde",

@@ -1,12 +1,18 @@
+mod db_sync;
 mod peerdb;
 
 use axum::routing;
 use axum::Json;
 use axum::Router;
 use clap::{Args, Parser, Subcommand};
+use db_sync::db_sync_handler;
 use peerdb::{rest_router, AppState};
 use std::net::SocketAddr;
+use tokio::try_join;
 use tracing::info;
+
+/// Update time for the recurrent `db_sync()` task. 5 minutes.
+const UPDATE_TIME: i64 = 5 * 60;
 
 #[derive(Parser)]
 #[command(author, version)]
@@ -35,10 +41,17 @@ struct CrawlOpts {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
-    match cli.command {
-        Commands::StartApiServer(opts) => start_api_server(opts.sql_db),
-    }
-    .await
+    let start_api_server_futures = {
+        match cli.command {
+            Commands::StartApiServer(opts) => start_api_server(opts.sql_db),
+        }
+    };
+
+    let db_sync_futures = { db_sync_handler(UPDATE_TIME) };
+
+    let (_, _) = try_join!(start_api_server_futures, db_sync_futures)?;
+
+    Ok(())
 }
 
 async fn start_api_server(sql_db: bool) -> Result<(), Box<dyn std::error::Error>> {

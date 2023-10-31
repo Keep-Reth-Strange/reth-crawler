@@ -30,6 +30,31 @@ impl AwsPeerDB {
 
         AwsPeerDB { client }
     }
+
+    pub async fn all_last_peers(
+        &self,
+        last_seen: String,
+        page_size: Option<i32>,
+    ) -> Result<Vec<PeerData>, ScanTableError> {
+        let page_size = page_size.unwrap_or(50);
+        let results: Result<Vec<_>, _> = self
+            .client
+            .scan()
+            .table_name("eth-peer-data")
+            .filter_expression("last_seen > :last_seen_parameter")
+            .expression_attribute_values(":last_seen_parameter", AttributeValue::S(last_seen))
+            .limit(page_size)
+            .into_paginator()
+            .items()
+            .send()
+            .collect()
+            .await;
+
+        match results {
+            Ok(peers) => peers.iter().map(|peer| Ok(peer.into())).collect(),
+            Err(err) => Err(err.into()),
+        }
+    }
 }
 
 #[async_trait]
