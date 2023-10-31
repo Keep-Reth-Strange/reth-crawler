@@ -4,7 +4,7 @@ mod peerdb;
 use axum::routing;
 use axum::Json;
 use axum::Router;
-use clap::{Args, Parser, Subcommand};
+use clap::{Parser, Subcommand};
 use db_sync::db_sync_handler;
 use peerdb::{rest_router, AppState};
 use std::net::SocketAddr;
@@ -18,7 +18,9 @@ const UPDATE_TIME: i64 = 5 * 60;
 #[command(author, version)]
 #[command(
     about = "Reth crawler api server",
-    long_about = "It starts the api server for the reth crawler project"
+    long_about = "It starts the api server for the reth crawler project.
+    
+    It always uses a SQLite database and periodically fetches updates from the dynamoDB of the crawler."
 )]
 struct Cli {
     #[command(subcommand)]
@@ -28,14 +30,7 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Start crawling the network
-    StartApiServer(CrawlOpts),
-}
-
-#[derive(Args)]
-struct CrawlOpts {
-    #[arg(long)]
-    /// Save peers into an in memory db. This is useful for local testing because you don't have to setup a centralized database.
-    sql_db: bool,
+    StartApiServer,
 }
 
 #[tokio::main]
@@ -43,7 +38,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
     let start_api_server_futures = {
         match cli.command {
-            Commands::StartApiServer(opts) => start_api_server(opts.sql_db),
+            Commands::StartApiServer => start_api_server(),
         }
     };
 
@@ -54,15 +49,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn start_api_server(sql_db: bool) -> Result<(), Box<dyn std::error::Error>> {
+async fn start_api_server() -> Result<(), Box<dyn std::error::Error>> {
     let app = Router::new()
         .route("/", routing::get(handler))
         .merge(rest_router())
-        .with_state(if sql_db {
-            AppState::new_sql().await
-        } else {
-            AppState::new_aws().await
-        });
+        .with_state(AppState::new_sql().await);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3030));
     info!("Server started, listening on {addr}");
