@@ -12,7 +12,7 @@ use tokio::try_join;
 use tracing::info;
 
 /// Update time for the recurrent `db_sync()` task. 5 minutes.
-const UPDATE_TIME: i64 = 5 * 60;
+const UPDATE_TIME: i64 = 300;
 
 #[derive(Parser)]
 #[command(author, version)]
