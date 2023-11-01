@@ -23,6 +23,6 @@ pub async fn append_to_file(peer_data: PeerData) -> eyre::Result<()> {
 }
 
 /// Helper function to save a peer.
-pub async fn save_peer(peer_data: PeerData, db: Arc<dyn PeerDB>) {
-    db.add_peer(peer_data).await.unwrap();
+pub async fn save_peer(peer_data: PeerData, db: Arc<dyn PeerDB>, ttl: i64) {
+    db.add_peer(peer_data, Some(ttl)).await.unwrap();
 }
