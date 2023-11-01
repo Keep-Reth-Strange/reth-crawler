@@ -1,6 +1,7 @@
 use chrono::{Duration, Utc};
 use reth_crawler_db::{AwsPeerDB, PeerDB, SqlPeerDB};
 use std::error::Error;
+use tracing::info;
 
 const PAGE_SIZE: Option<i32> = None;
 /// This is the time validity for peers inside the sqlite db. It's in days.

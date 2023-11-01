@@ -36,6 +36,7 @@ enum Commands {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
+    tracing_subscriber::fmt::init();
     let start_api_server_futures = {
         match cli.command {
             Commands::StartApiServer => start_api_server(),

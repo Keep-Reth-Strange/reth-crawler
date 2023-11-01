@@ -15,6 +15,7 @@ axum = { version = "0.6.4", features = ["macros"] }
 tokio.workspace = true
 tokio-stream.workspace = true
 tracing.workspace = true
+tracing-subscriber.workspace = true
 
 # serialization
 serde.workspace = true
