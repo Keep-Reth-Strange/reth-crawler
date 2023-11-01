@@ -64,6 +64,11 @@ impl AwsPeerDB {
 #[async_trait]
 impl PeerDB for AwsPeerDB {
     async fn add_peer(&self, peer_data: PeerData, ttl: Option<i64>) -> Result<(), AddItemError> {
+        let capabilities = peer_data
+            .capabilities
+            .iter()
+            .map(|cap| AttributeValue::S(cap.clone()))
+            .collect();
         let peer_id = AttributeValue::S(peer_data.id);
         let peer_ip = AttributeValue::S(peer_data.address);
         let client_version = AttributeValue::S(peer_data.client_version);
@@ -78,6 +83,8 @@ impl PeerDB for AwsPeerDB {
         let last_seen = AttributeValue::S(peer_data.last_seen);
         let region_source = AttributeValue::S(self.client.config().region().unwrap().to_string());
         let ttl = AttributeValue::N(ttl.unwrap().to_string());
+        let capabilities = AttributeValue::L(capabilities);
+        let eth_version = AttributeValue::S(peer_data.eth_version.to_string());
 
         match self
             .client
@@ -91,6 +98,8 @@ impl PeerDB for AwsPeerDB {
             .item("chain", chain)
             .item("country", country)
             .item("city", city)
+            .item("capabilities", capabilities)
+            .item("eth_version", eth_version)
             .item("last_seen", last_seen)
             .item("source_region", region_source)
             .item("genesis_block_hash", genesis_hash)
@@ -257,7 +266,9 @@ impl SqlPeerDB {
                 total_difficulty TEXT NOT NULL,
                 country TEXT,
                 city TEXT,
-                last_seen TEXT NOT NULL
+                last_seen TEXT NOT NULL,
+                capabilities TEXT,
+                eth_version INTEGER
             );",
                     [],
                 )
@@ -271,10 +282,11 @@ impl SqlPeerDB {
 #[async_trait]
 impl PeerDB for SqlPeerDB {
     async fn add_peer(&self, peer_data: PeerData, _: Option<i64>) -> Result<(), AddItemError> {
+        let cap = &peer_data.capabilities.join(",");
         self.db
             .call(move |conn| {
                 conn.execute(
-                    "INSERT OR REPLACE INTO eth_peer_data (id, ip, client_version, enode_url, port, chain, genesis_hash, best_block, total_difficulty, country, city, last_seen) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+                    "INSERT OR REPLACE INTO eth_peer_data (id, ip, client_version, enode_url, port, chain, genesis_hash, best_block, total_difficulty, country, city, last_seen, capabilities, eth_version) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
                     (
                         &peer_data.id,
                         &peer_data.address,
@@ -288,6 +300,8 @@ impl PeerDB for SqlPeerDB {
                         &peer_data.country,
                         &peer_data.city,
                         &peer_data.last_seen,
+                        &peer_data.capabilities.join(","),
+                        &peer_data.eth_version,
                     ),
                 )
             })
@@ -315,8 +329,14 @@ impl PeerDB for SqlPeerDB {
                         country: row.get(9)?,
                         city: row.get(10)?,
                         last_seen: row.get(11)?,
-                        capabilities: vec![], // TODO: right now we don't save capabilities into the db
-                        eth_version: 0, // TODO: right now we don't save eth_version into the db
+                        capabilities: row
+                            .get::<_, String>(12)?
+                            .as_str()
+                            .split(",")
+                            .into_iter()
+                            .map(|s| s.to_string())
+                            .collect(),
+                        eth_version: row.get(13)?,
                     })
                 })?;
                 let mut peers = vec![];
@@ -352,8 +372,14 @@ impl PeerDB for SqlPeerDB {
                         country: row.get(9)?,
                         city: row.get(10)?,
                         last_seen: row.get(11)?,
-                        capabilities: vec![], // TODO: right now we don't save capabilities into the db
-                        eth_version: 0, // TODO: right now we don't save eth_version into the db
+                        capabilities: row
+                            .get::<_, String>(12)?
+                            .as_str()
+                            .split(",")
+                            .into_iter()
+                            .map(|s| s.to_string())
+                            .collect(),
+                        eth_version: row.get(13)?,
                     })
                 })?;
                 let mut peers = vec![];
@@ -389,8 +415,14 @@ impl PeerDB for SqlPeerDB {
                         country: row.get(9)?,
                         city: row.get(10)?,
                         last_seen: row.get(11)?,
-                        capabilities: vec![], // TODO: right now we don't save capabilities into the db
-                        eth_version: 0, // TODO: right now we don't save eth_version into the db
+                        capabilities: row
+                            .get::<_, String>(12)?
+                            .as_str()
+                            .split(",")
+                            .into_iter()
+                            .map(|s| s.to_string())
+                            .collect(),
+                        eth_version: row.get(13)?,
                     })
                 })?;
                 let mut peers = vec![];
