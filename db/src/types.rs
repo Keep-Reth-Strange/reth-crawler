@@ -157,3 +157,9 @@ pub enum QueryItemError {
     #[error("An error occurred querying the SQL database: {0}")]
     SqlQueryItemError(#[from] tokio_rusqlite::Error),
 }
+
+#[derive(Debug, Error)]
+pub enum DeleteItemError {
+    #[error("An error occurred deleting a new item into the SQL database: {0}")]
+    SqlDeleteItemError(#[from] tokio_rusqlite::Error),
+}
