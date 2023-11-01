@@ -24,11 +24,11 @@ impl CrawlerService {
         Self { updates }
     }
 
-    pub async fn run(self, save_to_json: bool) -> (eyre::Result<()>, eyre::Result<()>, ()) {
+    pub async fn run(self) -> (eyre::Result<()>, eyre::Result<()>, ()) {
         join!(
-            self.updates.start_discv4(save_to_json),
-            self.updates.start_dnsdisc(save_to_json),
-            self.updates.start_network(save_to_json),
+            self.updates.start_discv4(),
+            self.updates.start_dnsdisc(),
+            self.updates.start_network(),
         )
     }
 }
