@@ -3,6 +3,7 @@ use async_trait::async_trait;
 use aws_config::meta::region::RegionProviderChain;
 use aws_sdk_dynamodb::types::AttributeValue;
 use aws_sdk_dynamodb::{config::Region, Client};
+use chrono::{Duration, Utc};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use tokio_rusqlite::Connection;
@@ -103,9 +104,16 @@ impl PeerDB for AwsPeerDB {
 
     async fn all_peers(&self, page_size: Option<i32>) -> Result<Vec<PeerData>, ScanTableError> {
         let page_size = page_size.unwrap_or(1000);
+        let now = Utc::now();
+        let cutoff = now
+            .checked_sub_signed(Duration::hours(24))
+            .unwrap()
+            .to_string();
         let results: Result<Vec<_>, _> = self
             .client
             .scan()
+            .filter_expression("last_seen > :last_seen_parameter")
+            .expression_attribute_values(":last_seen_parameter", AttributeValue::S(cutoff.clone()))
             .table_name("eth-peer-data")
             .limit(page_size)
             .into_paginator()

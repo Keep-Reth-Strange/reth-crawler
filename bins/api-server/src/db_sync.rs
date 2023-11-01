@@ -1,6 +1,6 @@
 use chrono::{Duration, Utc};
 use reth_crawler_db::{AwsPeerDB, PeerDB, SqlPeerDB};
-use std::{collections::HashSet, error::Error};
+use std::error::Error;
 
 const PAGE_SIZE: Option<i32> = None;
 
