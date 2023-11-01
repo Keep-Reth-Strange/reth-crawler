@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use crate::p2p::{handshake_eth, handshake_p2p};
-use chrono::Utc;
+use chrono::{Days, Utc};
 use futures::StreamExt;
 use ipgeolocate::{Locator, Service};
 use reth_crawler_db::{save_peer, AwsPeerDB, PeerDB, PeerData, SqlPeerDB};
@@ -116,6 +116,11 @@ impl UpdateListener {
                         captured_discv4.ban_ip(peer.address);
                         return;
                     }
+
+                    let ttl = Utc::now()
+                        .checked_add_days(Days::new(1))
+                        .unwrap()
+                        .timestamp();
                     let last_seen = Utc::now().to_string();
 
                     info!(
@@ -169,7 +174,7 @@ impl UpdateListener {
                         country,
                         city,
                     };
-                    save_peer(peer_data, db).await;
+                    save_peer(peer_data, db, ttl).await;
                 });
             }
         }
@@ -247,6 +252,10 @@ impl UpdateListener {
                     captured_discv4.ban_ip(peer.address);
                     return;
                 }
+                let ttl = Utc::now()
+                    .checked_add_days(Days::new(1))
+                    .unwrap()
+                    .timestamp();
                 let last_seen = Utc::now().to_string();
 
                 info!(
@@ -299,7 +308,7 @@ impl UpdateListener {
                     country,
                     city,
                 };
-                save_peer(peer_data, db).await;
+                save_peer(peer_data, db, ttl).await;
             });
         }
         Ok(())
@@ -340,6 +349,10 @@ impl UpdateListener {
                         let total_difficulty = status.total_difficulty.to_string();
                         let best_block = status.blockhash.to_string();
                         let genesis_block_hash = status.genesis.to_string();
+                        let ttl = Utc::now()
+                            .checked_add_days(Days::new(1))
+                            .unwrap()
+                            .timestamp();
                         let last_seen = Utc::now().to_string();
                         let mut country = String::default();
                         let mut city = String::default();
@@ -378,7 +391,7 @@ impl UpdateListener {
                             country,
                             city,
                         };
-                        save_peer(peer_data, db).await;
+                        save_peer(peer_data, db, ttl).await;
                     });
                 }
                 NetworkEvent::PeerAdded(_) | NetworkEvent::PeerRemoved(_) => {}
