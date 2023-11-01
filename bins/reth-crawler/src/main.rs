@@ -23,7 +23,11 @@ enum Commands {
 }
 
 #[derive(Args)]
-struct CrawlOpts {}
+struct CrawlOpts {
+    #[arg(long)]
+    /// Use a sqlite db for local testing.
+    local_db: bool,
+}
 
 #[tokio::main]
 async fn main() {
@@ -32,8 +36,13 @@ async fn main() {
     let cli = Cli::parse();
 
     match &cli.command {
-        Commands::Crawl(_) => {
-            let (_, _, _) = CrawlerFactory::new().await.make().await.run().await;
+        Commands::Crawl(opts) => {
+            let (_, _, _) = CrawlerFactory::new()
+                .await
+                .make(opts.local_db)
+                .await
+                .run()
+                .await;
         }
     }
 }
