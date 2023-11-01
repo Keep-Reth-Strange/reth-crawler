@@ -415,7 +415,8 @@ impl SqlPeerDB {
             .checked_sub_signed(Duration::days(time_validity))
             .unwrap()
             .to_string();
-        self.db
+        let deleted_peers_number = self
+            .db
             .call(move |conn| {
                 conn.execute(
                     "DELETE FROM eth_peer_data WHERE last_seen < ?1 ",
@@ -425,6 +426,7 @@ impl SqlPeerDB {
             .await
             .map_err(|err| DeleteItemError::SqlDeleteItemError(err))?;
 
+        info!("Number of peers pruned: {}", deleted_peers_number);
         Ok(())
     }
 }
