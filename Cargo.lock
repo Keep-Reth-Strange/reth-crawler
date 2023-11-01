@@ -4340,6 +4340,7 @@ dependencies = [
  "async-trait",
  "aws-config",
  "aws-sdk-dynamodb",
+ "chrono",
  "eyre",
  "reth-primitives",
  "serde",
