@@ -32,16 +32,28 @@ impl UpdateListener {
         network: NetworkHandle,
         key: SecretKey,
         node_tx: UnboundedSender<Vec<NodeRecord>>,
+        local_db: bool,
     ) -> Self {
         let p2p_failures = Arc::from(RwLock::from(HashMap::new()));
 
-        UpdateListener {
-            discv4,
-            dnsdisc,
-            key,
-            db: Arc::new(AwsPeerDB::new().await),
-            network,
-            p2p_failures,
+        if local_db {
+            UpdateListener {
+                discv4,
+                dnsdisc,
+                key,
+                db: Arc::new(SqlPeerDB::new().await),
+                network,
+                p2p_failures,
+            }
+        } else {
+            UpdateListener {
+                discv4,
+                dnsdisc,
+                key,
+                db: Arc::new(AwsPeerDB::new().await),
+                network,
+                p2p_failures,
+            }
         }
     }
 
