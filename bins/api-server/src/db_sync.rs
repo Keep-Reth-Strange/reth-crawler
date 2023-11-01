@@ -3,6 +3,9 @@ use reth_crawler_db::{AwsPeerDB, PeerDB, SqlPeerDB};
 use std::error::Error;
 
 const PAGE_SIZE: Option<i32> = None;
+/// This is the time validity for peers inside the sqlite db. It's in days.
+/// After one day a peer is considered invalid and it's deleted from the sqlite db.
+const PEERS_VALIDITY: i64 = 1;
 
 async fn db_sync(update_time: i64, first_sync: bool) -> Result<(), Box<dyn Error>> {
     // dynamoDB setup
@@ -30,6 +33,9 @@ async fn db_sync(update_time: i64, first_sync: bool) -> Result<(), Box<dyn Error
         sqlite_db.add_peer(peer, None).await?;
     }
 
+    // prune data older than a day in the sqliteDB
+    sqlite_db.prune_peers(PEERS_VALIDITY).await?;
+
     Ok(())
 }
 
@@ -39,7 +45,6 @@ pub async fn db_sync_handler(update_time: i64) -> Result<(), Box<dyn Error>> {
     let mut first_sync = true;
     loop {
         interval.tick().await;
-        let now = Utc::now();
         db_sync(update_time, first_sync).await?;
         first_sync = false;
     }

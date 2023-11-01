@@ -8,7 +8,7 @@ use aws_sdk_dynamodb::{
     types::AttributeValue,
 };
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PeerData {
     pub enode_url: String,
     pub id: String,
@@ -156,4 +156,10 @@ pub enum QueryItemError {
     InMemoryDbQueryItemError(),
     #[error("An error occurred querying the SQL database: {0}")]
     SqlQueryItemError(#[from] tokio_rusqlite::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum DeleteItemError {
+    #[error("An error occurred deleting a new item into the SQL database: {0}")]
+    SqlDeleteItemError(#[from] tokio_rusqlite::Error),
 }

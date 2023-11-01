@@ -1,4 +1,4 @@
-use crate::types::{AddItemError, PeerData, QueryItemError, ScanTableError};
+use crate::types::{AddItemError, DeleteItemError, PeerData, QueryItemError, ScanTableError};
 use async_trait::async_trait;
 use aws_config::meta::region::RegionProviderChain;
 use aws_sdk_dynamodb::types::AttributeValue;
@@ -405,5 +405,26 @@ impl PeerDB for SqlPeerDB {
             .map_err(|err| QueryItemError::SqlQueryItemError(err))?;
 
         Ok(Some(peers))
+    }
+}
+
+impl SqlPeerDB {
+    /// Prune peers that are older than `time_validity`. Note that `time_validity` **MUST** be in days.
+    pub async fn prune_peers(&self, time_validity: i64) -> Result<(), DeleteItemError> {
+        let cutoff = Utc::now()
+            .checked_sub_signed(Duration::days(time_validity))
+            .unwrap()
+            .to_string();
+        self.db
+            .call(move |conn| {
+                conn.execute(
+                    "DELETE FROM eth_peer_data WHERE last_seen < ?1 ",
+                    [cutoff.as_str()],
+                )
+            })
+            .await
+            .map_err(|err| DeleteItemError::SqlDeleteItemError(err))?;
+
+        Ok(())
     }
 }
