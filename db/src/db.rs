@@ -424,6 +424,7 @@ impl SqlPeerDB {
             })
             .await
             .map_err(|err| DeleteItemError::SqlDeleteItemError(err))?;
+
         Ok(())
     }
 }

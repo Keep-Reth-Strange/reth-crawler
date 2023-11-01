@@ -8,7 +8,7 @@ use aws_sdk_dynamodb::{
     types::AttributeValue,
 };
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PeerData {
     pub enode_url: String,
     pub id: String,
