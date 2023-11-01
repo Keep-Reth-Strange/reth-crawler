@@ -3,9 +3,9 @@ use reth_crawler_db::{AwsPeerDB, PeerDB, SqlPeerDB};
 use std::error::Error;
 
 const PAGE_SIZE: Option<i32> = None;
-/// This is the time validity for peers inside the sqlite db. It's one day in seconds.
+/// This is the time validity for peers inside the sqlite db. It's in days.
 /// After one day a peer is considered invalid and it's deleted from the sqlite db.
-const PEERS_VALIDITY: i64 = 60 * 60 * 24;
+const PEERS_VALIDITY: i64 = 1;
 
 async fn db_sync(update_time: i64, first_sync: bool) -> Result<(), Box<dyn Error>> {
     // dynamoDB setup

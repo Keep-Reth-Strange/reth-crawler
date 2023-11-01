@@ -409,10 +409,10 @@ impl PeerDB for SqlPeerDB {
 }
 
 impl SqlPeerDB {
-    /// Prune peers that are older than `time_validity`. Note that `time_validity` **MUST** be in seconds.
+    /// Prune peers that are older than `time_validity`. Note that `time_validity` **MUST** be in days.
     pub async fn prune_peers(&self, time_validity: i64) -> Result<(), DeleteItemError> {
         let cutoff = Utc::now()
-            .checked_sub_signed(Duration::seconds(time_validity))
+            .checked_sub_signed(Duration::days(time_validity))
             .unwrap()
             .to_string();
         self.db
