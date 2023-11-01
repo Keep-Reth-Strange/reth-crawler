@@ -45,7 +45,7 @@ impl UpdateListener {
         }
     }
 
-    pub async fn start_discv4(&self, save_to_json: bool) -> eyre::Result<()> {
+    pub async fn start_discv4(&self) -> eyre::Result<()> {
         let mut discv4_stream = self.discv4.update_stream().await?;
         let key = self.key;
         while let Some(update) = discv4_stream.next().await {
@@ -169,14 +169,14 @@ impl UpdateListener {
                         country,
                         city,
                     };
-                    save_peer(peer_data, save_to_json, db).await;
+                    save_peer(peer_data, db).await;
                 });
             }
         }
         Ok(())
     }
 
-    pub async fn start_dnsdisc(&self, save_to_json: bool) -> eyre::Result<()> {
+    pub async fn start_dnsdisc(&self) -> eyre::Result<()> {
         let mut dnsdisc_update_stream = self.dnsdisc.node_record_stream().await?;
         let key = self.key;
         while let Some(update) = dnsdisc_update_stream.next().await {
@@ -299,13 +299,13 @@ impl UpdateListener {
                     country,
                     city,
                 };
-                save_peer(peer_data, save_to_json, db).await;
+                save_peer(peer_data, db).await;
             });
         }
         Ok(())
     }
 
-    pub async fn start_network(&self, save_to_json: bool) {
+    pub async fn start_network(&self) {
         let mut net_events = self.network.event_listener();
 
         while let Some(event) = net_events.next().await {
@@ -378,7 +378,7 @@ impl UpdateListener {
                             country,
                             city,
                         };
-                        save_peer(peer_data, save_to_json, db).await;
+                        save_peer(peer_data, db).await;
                     });
                 }
                 NetworkEvent::PeerAdded(_) | NetworkEvent::PeerRemoved(_) => {}

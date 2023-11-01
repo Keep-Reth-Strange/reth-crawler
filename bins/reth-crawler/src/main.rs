@@ -23,11 +23,7 @@ enum Commands {
 }
 
 #[derive(Args)]
-struct CrawlOpts {
-    #[arg(long, conflicts_with = "sql_db")]
-    /// Save file into a json file called `peers_node.json` instead of saving them into a database.
-    save_to_json: bool,
-}
+struct CrawlOpts {}
 
 #[tokio::main]
 async fn main() {
@@ -36,13 +32,8 @@ async fn main() {
     let cli = Cli::parse();
 
     match &cli.command {
-        Commands::Crawl(opts) => {
-            let (_, _, _) = CrawlerFactory::new()
-                .await
-                .make()
-                .await
-                .run(opts.save_to_json)
-                .await;
+        Commands::Crawl(_) => {
+            let (_, _, _) = CrawlerFactory::new().await.make().await.run().await;
         }
     }
 }
