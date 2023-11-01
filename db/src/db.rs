@@ -84,7 +84,7 @@ impl PeerDB for AwsPeerDB {
         let region_source = AttributeValue::S(self.client.config().region().unwrap().to_string());
         let ttl = AttributeValue::N(ttl.unwrap().to_string());
         let capabilities = AttributeValue::L(capabilities);
-        let eth_version = AttributeValue::S(peer_data.eth_version.to_string());
+        let eth_version = AttributeValue::N(peer_data.eth_version.to_string());
 
         match self
             .client
