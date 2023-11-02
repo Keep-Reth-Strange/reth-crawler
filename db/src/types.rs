@@ -163,3 +163,8 @@ pub enum DeleteItemError {
     #[error("An error occurred deleting a new item into the SQL database: {0}")]
     SqlDeleteItemError(#[from] tokio_rusqlite::Error),
 }
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ClientData {
+    pub client_version: String,
+}
