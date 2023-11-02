@@ -117,7 +117,7 @@ impl PeerDB for AwsPeerDB {
     async fn all_peers(&self, page_size: Option<i32>) -> Result<Vec<PeerData>, ScanTableError> {
         let page_size = page_size.unwrap_or(1000);
         let cutoff = Utc::now()
-            .checked_sub_signed(Duration::hours(24))
+            .checked_sub_signed(Duration::hours(72))
             .unwrap()
             .to_string();
         let results: Result<Vec<_>, _> = self
