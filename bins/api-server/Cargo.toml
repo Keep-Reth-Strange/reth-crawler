@@ -11,7 +11,8 @@ aws-sdk-dynamodb.workspace = true
 # general
 clap.workspace = true
 chrono.workspace = true
-axum = { version = "0.6.4", features = ["macros"] }
+axum = { version = "0.6.4", features = ["macros","headers"] }
+tower-http = { version = "0.4.4", features = ["cors"] }
 tokio.workspace = true
 tokio-stream.workspace = true
 tracing.workspace = true
