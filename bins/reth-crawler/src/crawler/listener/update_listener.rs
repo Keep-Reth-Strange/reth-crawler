@@ -130,7 +130,7 @@ impl UpdateListener {
                     }
 
                     let ttl = Utc::now()
-                        .checked_add_days(Days::new(1))
+                        .checked_add_days(Days::new(3))
                         .unwrap()
                         .timestamp();
                     let last_seen = Utc::now().to_string();
@@ -265,7 +265,7 @@ impl UpdateListener {
                     return;
                 }
                 let ttl = Utc::now()
-                    .checked_add_days(Days::new(1))
+                    .checked_add_days(Days::new(3))
                     .unwrap()
                     .timestamp();
                 let last_seen = Utc::now().to_string();
@@ -362,7 +362,7 @@ impl UpdateListener {
                         let best_block = status.blockhash.to_string();
                         let genesis_block_hash = status.genesis.to_string();
                         let ttl = Utc::now()
-                            .checked_add_days(Days::new(1))
+                            .checked_add_days(Days::new(3))
                             .unwrap()
                             .timestamp();
                         let last_seen = Utc::now().to_string();

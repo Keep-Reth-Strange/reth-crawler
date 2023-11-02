@@ -5,8 +5,8 @@ use tracing::info;
 
 const PAGE_SIZE: Option<i32> = None;
 /// This is the time validity for peers inside the sqlite db. It's in days.
-/// After one day a peer is considered invalid and it's deleted from the sqlite db.
-const PEERS_VALIDITY: i64 = 1;
+/// After 3 days a peer is considered invalid and it's deleted from the sqlite db.
+const PEERS_VALIDITY: i64 = 3;
 
 async fn db_sync(update_time: i64, first_sync: bool) -> Result<(), Box<dyn Error>> {
     // dynamoDB setup
