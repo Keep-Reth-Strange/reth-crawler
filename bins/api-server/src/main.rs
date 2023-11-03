@@ -10,8 +10,8 @@ use db_sync::db_sync_handler;
 use peerdb::{rest_router, AppState};
 use std::net::SocketAddr;
 use tokio::try_join;
-use tracing::info;
 use tower_http::cors::{Any, CorsLayer};
+use tracing::info;
 
 /// Update time for the recurrent `db_sync()` task. 5 minutes.
 const UPDATE_TIME: i64 = 300;
@@ -63,7 +63,7 @@ async fn start_api_server() -> Result<(), Box<dyn std::error::Error>> {
         .with_state(AppState::new_sql().await)
         .layer(cors);
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3030));
+    let addr = SocketAddr::from(([0, 0, 0, 0], 3030));
     info!("Server started, listening on {addr}");
 
     axum::Server::bind(&addr)
