@@ -1,5 +1,12 @@
-FROM  rustlang/rust:nightly AS builder
+FROM lukemathwalker/cargo-chef:latest-rust-1 AS chef
+WORKDIR workdir
 
+From chef as planner
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
+
+FROM chef as builder
+COPY --from=planner /workdir/recipe.json recipe.json
 RUN apt-get update -y && \
     apt-get satisfy --no-install-recommends -y "\
         libclang-dev, \
@@ -12,18 +19,15 @@ RUN apt-get update -y && \
         libsqlite3-dev \
     "
 
-WORKDIR /workdir                       
-ENV CARGO_HOME=/workdir/.cargo                  
-COPY ./Cargo.toml ./Cargo.lock ./
-COPY ./bins ./bins
-COPY ./db ./db
-RUN cargo +nightly build --release
+RUN cargo chef cook --release --recipe-path recipe.json
+COPY . .
+RUN cargo build --release
 
 FROM debian:bullseye-20230202-slim as reth-crawler
-RUN apt-get update && apt-get install -y sqlite3 libcurl4 && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+# RUN apt-get update && apt-get install -y sqlite3 libcurl4 && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-COPY --from=0 /workdir/target/release/reth-crawler /usr/bin/reth-crawler
-COPY --from=0 /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY --from=builder /workdir/target/release/reth-crawler /usr/bin/reth-crawler
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 RUN chmod +x /usr/bin/reth-crawler
 ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 ENV SSL_CERT_DIR=/etc/ssl/certs
@@ -34,10 +38,10 @@ CMD ["/usr/bin/reth-crawler", "crawl"]
 LABEL service=reth-crawler
 
 FROM debian:bullseye-20230202-slim as reth-api-server
-RUN apt-get update && apt-get install -y sqlite3 libcurl4 && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+# RUN apt-get update && apt-get install -y sqlite3 libcurl4 && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-COPY --from=0 /workdir/target/release/reth-crawler-api-server /usr/bin/reth-api-server
-COPY --from=0 /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY --from=builder /workdir/target/release/reth-crawler-api-server /usr/bin/reth-api-server
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 RUN chmod +x /usr/bin/reth-api-server
 ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 ENV SSL_CERT_DIR=/etc/ssl/certs
