@@ -1,4 +1,4 @@
-FROM lukemathwalker/cargo-chef:latest-rust-1 AS chef
+FROM lukemathwalker/cargo-chef:latest-rust-slim-bullseye AS chef
 WORKDIR workdir
 
 From chef as planner
