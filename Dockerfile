@@ -24,7 +24,7 @@ COPY . .
 RUN cargo build --release
 
 FROM debian:bullseye-20230202-slim as reth-crawler
-# RUN apt-get update && apt-get install -y sqlite3 libcurl4 && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+RUN apt-get update && apt-get install -y sqlite3 libcurl4 && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 COPY --from=builder /workdir/target/release/reth-crawler /usr/bin/reth-crawler
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
@@ -38,7 +38,7 @@ CMD ["/usr/bin/reth-crawler", "crawl"]
 LABEL service=reth-crawler
 
 FROM debian:bullseye-20230202-slim as reth-api-server
-# RUN apt-get update && apt-get install -y sqlite3 libcurl4 && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+RUN apt-get update && apt-get install -y sqlite3 libcurl4 && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 COPY --from=builder /workdir/target/release/reth-crawler-api-server /usr/bin/reth-api-server
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
