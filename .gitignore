@@ -1,4 +1,4 @@
 # Ignore target folder
 /target
 /.vscode
-peers_data.json
+peers_data.db

@@ -24,6 +24,7 @@ pub struct PeerData {
     pub last_seen: String,
     pub country: String,
     pub city: String,
+    pub synced: Option<bool>,
 }
 
 impl PeerData {
@@ -42,6 +43,7 @@ impl PeerData {
         total_difficulty: String,
         chain: String,
         eth_version: u8,
+        synced: Option<bool>,
     ) -> Self {
         Self {
             enode_url,
@@ -58,6 +60,7 @@ impl PeerData {
             best_block: best_block,
             eth_version,
             genesis_block_hash: genesis_block_hash,
+            synced,
         }
     }
 }
@@ -79,6 +82,7 @@ impl From<&HashMap<String, AttributeValue>> for PeerData {
             as_string(value.get("total_difficulty"), &"".to_string()),
             as_string(value.get("chain"), &"".to_string()),
             as_u8(value.get("eth_version"), 0),
+            as_option_bool(value.get("synced"), None),
         );
 
         peer_data
@@ -126,6 +130,15 @@ pub fn as_string_vec(val: Option<&AttributeValue>) -> Vec<String> {
         }
     }
     vec![]
+}
+
+pub fn as_option_bool(val: Option<&AttributeValue>, default: Option<bool>) -> Option<bool> {
+    if let Some(v) = val {
+        if let Ok(n) = v.as_bool() {
+            return Some(*n);
+        }
+    }
+    default
 }
 
 #[derive(Debug, Error)]

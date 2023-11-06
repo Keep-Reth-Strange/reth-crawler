@@ -3,6 +3,8 @@ use std::sync::{Arc, RwLock};
 
 use crate::p2p::{handshake_eth, handshake_p2p};
 use chrono::{Days, Utc};
+use ethers::providers::{Http, Middleware, Provider};
+use ethers::types::H256;
 use futures::StreamExt;
 use ipgeolocate::{Locator, Service};
 use reth_crawler_db::{save_peer, AwsPeerDB, PeerDB, PeerData, SqlPeerDB};
@@ -21,9 +23,12 @@ pub struct UpdateListener {
     key: SecretKey,
     db: Arc<dyn PeerDB>,
     p2p_failures: Arc<RwLock<HashMap<PeerId, u64>>>,
+    provider: Provider<Http>,
 }
 
 const P2P_FAILURE_THRESHOLD: u8 = 5;
+/// How many blocks can a node be lagging and still be considered `synced`.
+const SYNCED_THRESHOLD: u64 = 100;
 
 impl UpdateListener {
     pub async fn new(
@@ -35,7 +40,10 @@ impl UpdateListener {
         local_db: bool,
     ) -> Self {
         let p2p_failures = Arc::from(RwLock::from(HashMap::new()));
-
+        // initialize a new http provider
+        // this is a paradigm full node
+        let rpc_url = "http://69.67.151.138:8645";
+        let provider = Provider::try_from(rpc_url).expect("Provider must work correctly!");
         if local_db {
             UpdateListener {
                 discv4,
@@ -44,6 +52,7 @@ impl UpdateListener {
                 db: Arc::new(SqlPeerDB::new().await),
                 network,
                 p2p_failures,
+                provider,
             }
         } else {
             UpdateListener {
@@ -53,6 +62,7 @@ impl UpdateListener {
                 db: Arc::new(AwsPeerDB::new().await),
                 network,
                 p2p_failures,
+                provider,
             }
         }
     }
@@ -61,6 +71,7 @@ impl UpdateListener {
         let mut discv4_stream = self.discv4.update_stream().await?;
         let key = self.key;
         while let Some(update) = discv4_stream.next().await {
+            let provider = self.provider.clone();
             let db = self.db.clone();
             let captured_discv4 = self.discv4.clone();
             let p2p_failures = self.p2p_failures.clone();
@@ -169,6 +180,27 @@ impl UpdateListener {
                     let best_block = their_status.blockhash.to_string();
                     let genesis_block_hash = their_status.genesis.to_string();
 
+                    // check if peer is synced with the latest chain's blocks
+                    let mut synced = None;
+                    if let Ok(last_block_number) = provider.get_block_number().await {
+                        info!("last block number: {}", last_block_number);
+                        let peer_best_block_hash = Into::<H256>::into(their_status.blockhash.0);
+                        info!("peer best block hash: {:#?}", peer_best_block_hash);
+                        if let Ok(Some(peer_best_block)) =
+                            provider.get_block(peer_best_block_hash).await
+                        {
+                            let peer_best_block_number =
+                                peer_best_block.number.expect("it's not a pending block!");
+                            if peer_best_block_number < last_block_number - SYNCED_THRESHOLD {
+                                synced = Some(false);
+                            } else {
+                                synced = Some(true);
+                            }
+                            info!("peer best block number: {}", peer_best_block_number);
+                            info!("sync: {}", synced.unwrap());
+                        }
+                    }
+
                     // collect data into `PeerData`
                     let peer_data = PeerData {
                         enode_url: peer.to_string(),
@@ -185,6 +217,7 @@ impl UpdateListener {
                         last_seen,
                         country,
                         city,
+                        synced,
                     };
                     save_peer(peer_data, db, ttl).await;
                 });
@@ -197,6 +230,7 @@ impl UpdateListener {
         let mut dnsdisc_update_stream = self.dnsdisc.node_record_stream().await?;
         let key = self.key;
         while let Some(update) = dnsdisc_update_stream.next().await {
+            let provider = self.provider.clone();
             let db = self.db.clone();
             let p2p_failures = self.p2p_failures.clone();
             let captured_discv4 = self.discv4.clone();
@@ -303,6 +337,27 @@ impl UpdateListener {
                 let best_block = their_status.blockhash.to_string();
                 let genesis_block_hash = their_status.genesis.to_string();
 
+                // check if peer is synced with the latest chain's blocks
+                let mut synced = None;
+                if let Ok(last_block_number) = provider.get_block_number().await {
+                    info!("last block number: {}", last_block_number);
+                    let peer_best_block_hash = Into::<H256>::into(their_status.blockhash.0);
+                    info!("peer best block hash: {:#?}", peer_best_block_hash);
+                    if let Ok(Some(peer_best_block)) =
+                        provider.get_block(peer_best_block_hash).await
+                    {
+                        let peer_best_block_number =
+                            peer_best_block.number.expect("it's not a pending block!");
+                        if peer_best_block_number < last_block_number - SYNCED_THRESHOLD {
+                            synced = Some(false);
+                        } else {
+                            synced = Some(true);
+                        }
+                        info!("peer best block number: {}", peer_best_block_number);
+                        info!("sync: {}", synced.unwrap());
+                    }
+                }
+
                 // collect data into `PeerData`
                 let peer_data = PeerData {
                     enode_url: peer.to_string(),
@@ -319,6 +374,7 @@ impl UpdateListener {
                     last_seen,
                     country,
                     city,
+                    synced,
                 };
                 save_peer(peer_data, db, ttl).await;
             });
@@ -344,6 +400,7 @@ impl UpdateListener {
                         "Session Established with peer {}",
                         remote_addr.ip().to_string()
                     );
+                    let provider = self.provider.clone();
                     let db = self.db.clone();
                     let peer_handle = self.network.peers_handle().clone();
                     tokio::spawn(async move {
@@ -387,6 +444,27 @@ impl UpdateListener {
                             return;
                         }
 
+                        // check if peer is synced with the latest chain's blocks
+                        let mut synced = None;
+                        if let Ok(last_block_number) = provider.get_block_number().await {
+                            info!("last block number: {}", last_block_number);
+                            let peer_best_block_hash = Into::<H256>::into(status.blockhash.0);
+                            info!("peer best block hash: {:#?}", peer_best_block_hash);
+                            if let Ok(Some(peer_best_block)) =
+                                provider.get_block(peer_best_block_hash).await
+                            {
+                                let peer_best_block_number =
+                                    peer_best_block.number.expect("it's not a pending block!");
+                                if peer_best_block_number < last_block_number - SYNCED_THRESHOLD {
+                                    synced = Some(false);
+                                } else {
+                                    synced = Some(true);
+                                }
+                                info!("peer best block number: {}", peer_best_block_number);
+                                info!("sync: {}", synced.unwrap());
+                            }
+                        }
+
                         let peer_data = PeerData {
                             enode_url: enode_url.to_string(),
                             id: peer_id.to_string(),
@@ -402,6 +480,7 @@ impl UpdateListener {
                             last_seen,
                             country,
                             city,
+                            synced,
                         };
                         save_peer(peer_data, db, ttl).await;
                     });
