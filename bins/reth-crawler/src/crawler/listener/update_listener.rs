@@ -183,9 +183,9 @@ impl UpdateListener {
                     // check if peer is synced with the latest chain's blocks
                     let mut synced = None;
                     if let Ok(last_block_number) = provider.get_block_number().await {
-                        println!("last block number: {}", last_block_number);
+                        info!("last block number: {}", last_block_number);
                         let peer_best_block_hash = Into::<H256>::into(their_status.blockhash.0);
-                        println!("peer best block hash: {:#?}", peer_best_block_hash);
+                        info!("peer best block hash: {:#?}", peer_best_block_hash);
                         if let Ok(Some(peer_best_block)) =
                             provider.get_block(peer_best_block_hash).await
                         {
@@ -196,8 +196,8 @@ impl UpdateListener {
                             } else {
                                 synced = Some(true);
                             }
-                            println!("peer best block number: {}", peer_best_block_number);
-                            println!("sync: {}", synced.unwrap());
+                            info!("peer best block number: {}", peer_best_block_number);
+                            info!("sync: {}", synced.unwrap());
                         }
                     }
 
@@ -340,9 +340,9 @@ impl UpdateListener {
                 // check if peer is synced with the latest chain's blocks
                 let mut synced = None;
                 if let Ok(last_block_number) = provider.get_block_number().await {
-                    println!("last block number: {}", last_block_number);
+                    info!("last block number: {}", last_block_number);
                     let peer_best_block_hash = Into::<H256>::into(their_status.blockhash.0);
-                    println!("peer best block hash: {:#?}", peer_best_block_hash);
+                    info!("peer best block hash: {:#?}", peer_best_block_hash);
                     if let Ok(Some(peer_best_block)) =
                         provider.get_block(peer_best_block_hash).await
                     {
@@ -353,8 +353,8 @@ impl UpdateListener {
                         } else {
                             synced = Some(true);
                         }
-                        println!("peer best block number: {}", peer_best_block_number);
-                        println!("sync: {}", synced.unwrap());
+                        info!("peer best block number: {}", peer_best_block_number);
+                        info!("sync: {}", synced.unwrap());
                     }
                 }
 
@@ -447,9 +447,9 @@ impl UpdateListener {
                         // check if peer is synced with the latest chain's blocks
                         let mut synced = None;
                         if let Ok(last_block_number) = provider.get_block_number().await {
-                            println!("last block number: {}", last_block_number);
+                            info!("last block number: {}", last_block_number);
                             let peer_best_block_hash = Into::<H256>::into(status.blockhash.0);
-                            println!("peer best block hash: {:#?}", peer_best_block_hash);
+                            info!("peer best block hash: {:#?}", peer_best_block_hash);
                             if let Ok(Some(peer_best_block)) =
                                 provider.get_block(peer_best_block_hash).await
                             {
@@ -460,8 +460,8 @@ impl UpdateListener {
                                 } else {
                                     synced = Some(true);
                                 }
-                                println!("peer best block number: {}", peer_best_block_number);
-                                println!("sync: {}", synced.unwrap());
+                                info!("peer best block number: {}", peer_best_block_number);
+                                info!("sync: {}", synced.unwrap());
                             }
                         }
 
