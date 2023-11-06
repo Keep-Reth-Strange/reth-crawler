@@ -28,7 +28,7 @@ tokio.workspace = true
 tracing-subscriber.workspace = true
 console-subscriber.workspace = true
 tracing.workspace = true
-ipgeolocate = "0.3.5"
+ipgeolocate = { git = "https://github.com/0xprames/ipgeolocate.git", branch = "main" }
 eyre.workspace = true
 futures.workspace = true
 chrono.workspace = true
