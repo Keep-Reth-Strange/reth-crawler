@@ -41,8 +41,8 @@ impl UpdateListener {
     ) -> Self {
         let p2p_failures = Arc::from(RwLock::from(HashMap::new()));
         // initialize a new http provider
-        // TODO: change it with a dedicated node (maybe a paradigm one?)
-        let rpc_url = "https://eth.llamarpc.com";
+        // this is a paradigm full node
+        let rpc_url = "http://69.67.151.138:8645";
         let provider = Provider::try_from(rpc_url).expect("Provider must work correctly!");
         if local_db {
             UpdateListener {
