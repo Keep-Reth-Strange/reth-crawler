@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use aws_config::meta::region::RegionProviderChain;
 use aws_sdk_dynamodb::types::AttributeValue;
 use aws_sdk_dynamodb::{config::Region, Client};
-use chrono::{DateTime, Days, Duration, Utc};
+use chrono::{Duration, Utc};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use tokio_rusqlite::Connection;
@@ -85,6 +85,11 @@ impl PeerDB for AwsPeerDB {
         let ttl = AttributeValue::N(ttl.unwrap().to_string());
         let capabilities = AttributeValue::L(capabilities);
         let eth_version = AttributeValue::N(peer_data.eth_version.to_string());
+        let synced = if let Some(synced) = peer_data.synced {
+            AttributeValue::Bool(synced)
+        } else {
+            AttributeValue::Null(true)
+        };
 
         match self
             .client
@@ -106,6 +111,7 @@ impl PeerDB for AwsPeerDB {
             .item("best_block", best_block)
             .item("total_difficulty", total_difficulty)
             .item("ttl", ttl)
+            .item("synced", synced)
             .send()
             .await
         {
@@ -268,7 +274,8 @@ impl SqlPeerDB {
                 city TEXT,
                 last_seen TEXT NOT NULL,
                 capabilities TEXT,
-                eth_version INTEGER
+                eth_version INTEGER,
+                synced BOOLEAN
             );",
                     [],
                 )
@@ -282,11 +289,10 @@ impl SqlPeerDB {
 #[async_trait]
 impl PeerDB for SqlPeerDB {
     async fn add_peer(&self, peer_data: PeerData, _: Option<i64>) -> Result<(), AddItemError> {
-        let cap = &peer_data.capabilities.join(",");
         self.db
             .call(move |conn| {
                 conn.execute(
-                    "INSERT OR REPLACE INTO eth_peer_data (id, ip, client_version, enode_url, port, chain, genesis_hash, best_block, total_difficulty, country, city, last_seen, capabilities, eth_version) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+                    "INSERT OR REPLACE INTO eth_peer_data (id, ip, client_version, enode_url, port, chain, genesis_hash, best_block, total_difficulty, country, city, last_seen, capabilities, eth_version, synced) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
                     (
                         &peer_data.id,
                         &peer_data.address,
@@ -302,6 +308,7 @@ impl PeerDB for SqlPeerDB {
                         &peer_data.last_seen,
                         &peer_data.capabilities.join(","),
                         &peer_data.eth_version,
+                        &peer_data.synced,
                     ),
                 )
             })
@@ -337,6 +344,7 @@ impl PeerDB for SqlPeerDB {
                             .map(|s| s.to_string())
                             .collect(),
                         eth_version: row.get(13)?,
+                        synced: row.get(14)?,
                     })
                 })?;
                 let mut peers = vec![];
@@ -380,6 +388,7 @@ impl PeerDB for SqlPeerDB {
                             .map(|s| s.to_string())
                             .collect(),
                         eth_version: row.get(13)?,
+                        synced: row.get(14)?,
                     })
                 })?;
                 let mut peers = vec![];
@@ -423,6 +432,7 @@ impl PeerDB for SqlPeerDB {
                             .map(|s| s.to_string())
                             .collect(),
                         eth_version: row.get(13)?,
+                        synced: row.get(14)?,
                     })
                 })?;
                 let mut peers = vec![];

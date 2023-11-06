@@ -23,6 +23,7 @@ serde.workspace = true
 
 # general
 clap.workspace = true
+ethers.workspace = true
 tokio.workspace = true
 tracing-subscriber.workspace = true
 console-subscriber.workspace = true
