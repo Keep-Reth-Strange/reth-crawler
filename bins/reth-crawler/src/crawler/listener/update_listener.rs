@@ -348,7 +348,7 @@ impl UpdateListener {
                     {
                         let peer_best_block_number =
                             peer_best_block.number.expect("it's not a pending block!");
-                        if peer_best_block_number < last_block_number - 100 {
+                        if peer_best_block_number < last_block_number - SYNCED_THRESHOLD {
                             synced = Some(false);
                         } else {
                             synced = Some(true);
@@ -455,7 +455,7 @@ impl UpdateListener {
                             {
                                 let peer_best_block_number =
                                     peer_best_block.number.expect("it's not a pending block!");
-                                if peer_best_block_number < last_block_number - 100 {
+                                if peer_best_block_number < last_block_number - SYNCED_THRESHOLD {
                                     synced = Some(false);
                                 } else {
                                     synced = Some(true);
