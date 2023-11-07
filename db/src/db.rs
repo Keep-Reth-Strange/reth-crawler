@@ -89,6 +89,7 @@ impl PeerDB for AwsPeerDB {
         } else {
             AttributeValue::Null(true)
         };
+        let isp = AttributeValue::S(peer_data.isp);
 
         match self
             .client
@@ -110,6 +111,7 @@ impl PeerDB for AwsPeerDB {
             .item("best_block", best_block)
             .item("total_difficulty", total_difficulty)
             .item("synced", synced)
+            .item("isp", isp)
             .send()
             .await
         {
@@ -273,7 +275,8 @@ impl SqlPeerDB {
                 last_seen TEXT NOT NULL,
                 capabilities TEXT,
                 eth_version INTEGER,
-                synced BOOLEAN
+                synced BOOLEAN,
+                isp TEXT
             );",
                     [],
                 )
@@ -290,7 +293,7 @@ impl PeerDB for SqlPeerDB {
         self.db
             .call(move |conn| {
                 conn.execute(
-                    "INSERT OR REPLACE INTO eth_peer_data (id, ip, client_version, enode_url, port, chain, genesis_hash, best_block, total_difficulty, country, city, last_seen, capabilities, eth_version, synced) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
+                    "INSERT OR REPLACE INTO eth_peer_data (id, ip, client_version, enode_url, port, chain, genesis_hash, best_block, total_difficulty, country, city, last_seen, capabilities, eth_version, synced, isp) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
                     (
                         &peer_data.id,
                         &peer_data.address,
@@ -307,6 +310,7 @@ impl PeerDB for SqlPeerDB {
                         &peer_data.capabilities.join(","),
                         &peer_data.eth_version,
                         &peer_data.synced,
+                        &peer_data.isp,
                     ),
                 )
             })
@@ -343,6 +347,7 @@ impl PeerDB for SqlPeerDB {
                             .collect(),
                         eth_version: row.get(13)?,
                         synced: row.get(14)?,
+                        isp: row.get(15)?,
                     })
                 })?;
                 let mut peers = vec![];
@@ -387,6 +392,7 @@ impl PeerDB for SqlPeerDB {
                             .collect(),
                         eth_version: row.get(13)?,
                         synced: row.get(14)?,
+                        isp: row.get(15)?,
                     })
                 })?;
                 let mut peers = vec![];
@@ -431,6 +437,7 @@ impl PeerDB for SqlPeerDB {
                             .collect(),
                         eth_version: row.get(13)?,
                         synced: row.get(14)?,
+                        isp: row.get(15)?,
                     })
                 })?;
                 let mut peers = vec![];
@@ -445,28 +452,5 @@ impl PeerDB for SqlPeerDB {
             .map_err(|err| QueryItemError::SqlQueryItemError(err))?;
 
         Ok(Some(peers))
-    }
-}
-
-impl SqlPeerDB {
-    /// Prune peers that are older than `time_validity`. Note that `time_validity` **MUST** be in days.
-    pub async fn prune_peers(&self, time_validity: i64) -> Result<(), DeleteItemError> {
-        let cutoff = Utc::now()
-            .checked_sub_signed(Duration::days(time_validity))
-            .unwrap()
-            .to_string();
-        let deleted_peers_number = self
-            .db
-            .call(move |conn| {
-                conn.execute(
-                    "DELETE FROM eth_peer_data WHERE last_seen < ?1 ",
-                    [cutoff.as_str()],
-                )
-            })
-            .await
-            .map_err(|err| DeleteItemError::SqlDeleteItemError(err))?;
-
-        info!("Number of peers pruned: {}", deleted_peers_number);
-        Ok(())
     }
 }

@@ -34,9 +34,6 @@ async fn db_sync(update_time: i64, first_sync: bool) -> Result<(), Box<dyn Error
         sqlite_db.add_peer(peer).await?;
     }
 
-    // prune data older than a day in the sqliteDB
-    sqlite_db.prune_peers(PEERS_VALIDITY).await?;
-
     Ok(())
 }
 

@@ -25,6 +25,7 @@ pub struct PeerData {
     pub country: String,
     pub city: String,
     pub synced: Option<bool>,
+    pub isp: String,
 }
 
 impl PeerData {
@@ -44,6 +45,7 @@ impl PeerData {
         chain: String,
         eth_version: u8,
         synced: Option<bool>,
+        isp: String,
     ) -> Self {
         Self {
             enode_url,
@@ -61,6 +63,7 @@ impl PeerData {
             eth_version,
             genesis_block_hash: genesis_block_hash,
             synced,
+            isp,
         }
     }
 }
@@ -83,6 +86,7 @@ impl From<&HashMap<String, AttributeValue>> for PeerData {
             as_string(value.get("chain"), &"".to_string()),
             as_u8(value.get("eth_version"), 0),
             as_option_bool(value.get("synced"), None),
+            as_string(value.get("isp"), &"".to_string()),
         );
 
         peer_data

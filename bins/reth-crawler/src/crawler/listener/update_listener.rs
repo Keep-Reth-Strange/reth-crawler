@@ -153,11 +153,13 @@ impl UpdateListener {
 
                     let mut country = String::default();
                     let mut city = String::default();
+                    let mut isp = String::default();
 
                     match Locator::get(&ip_addr, service).await {
                         Ok(loc) => {
                             country = loc.country;
                             city = loc.city;
+                            isp = loc.isp;
                         }
                         Err(_) => {
                             // leave `country` and `city` empty if not able to get them
@@ -210,6 +212,7 @@ impl UpdateListener {
                         country,
                         city,
                         synced,
+                        isp,
                     };
                     save_peer(peer_data, db).await;
                 });
@@ -303,11 +306,13 @@ impl UpdateListener {
 
                 let mut country = String::default();
                 let mut city = String::default();
+                let mut isp = String::default();
 
                 match Locator::get(&ip_addr, service).await {
                     Ok(loc) => {
                         country = loc.country;
                         city = loc.city;
+                        isp = loc.isp;
                     }
                     Err(_) => {
                         // leave `country` and `city` empty if not able to get them
@@ -360,6 +365,7 @@ impl UpdateListener {
                     country,
                     city,
                     synced,
+                    isp,
                 };
                 save_peer(peer_data, db).await;
             });
@@ -406,6 +412,7 @@ impl UpdateListener {
                         let last_seen = Utc::now().to_string();
                         let mut country = String::default();
                         let mut city = String::default();
+                        let mut isp = String::default();
                         let service = Service::IpApi;
                         let ip_addr = remote_addr.ip().to_string();
 
@@ -413,9 +420,10 @@ impl UpdateListener {
                             Ok(loc) => {
                                 country = loc.country;
                                 city = loc.city;
+                                isp = loc.isp;
                             }
                             Err(_) => {
-                                // leave `country` and `city` empty if not able to get them
+                                // leave `country` and `city`empty if not able to get them
                             }
                         }
                         // these peers inflate our numbers, same IP multiple generated ID
@@ -458,6 +466,7 @@ impl UpdateListener {
                             country,
                             city,
                             synced,
+                            isp,
                         };
                         save_peer(peer_data, db).await;
                     });
