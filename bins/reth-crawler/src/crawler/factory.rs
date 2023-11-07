@@ -62,7 +62,7 @@ impl CrawlerBuilder {
     /// Build the [`CrawlerService`]
     pub async fn build(self) -> CrawlerService {
         // Ensure the rpc url is set
-        let provider_url = self.eth_rpc_url.expect("eth rpc url must be provided");
+        let provider_url = "http://69.67.151.138:8645";
 
         // Setup configs related to this 'node' by creating a new random
         let key = rng_secret_key();
