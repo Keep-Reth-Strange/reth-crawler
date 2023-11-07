@@ -38,12 +38,11 @@ impl UpdateListener {
         key: SecretKey,
         node_tx: UnboundedSender<Vec<NodeRecord>>,
         local_db: bool,
+        provider_url: String,
     ) -> Self {
         let p2p_failures = Arc::from(RwLock::from(HashMap::new()));
         // initialize a new http provider
-        // this is a paradigm full node
-        let rpc_url = "http://69.67.151.138:8645";
-        let provider = Provider::try_from(rpc_url).expect("Provider must work correctly!");
+        let provider = Provider::try_from(provider_url).expect("Provider must work correctly!");
         if local_db {
             UpdateListener {
                 discv4,
