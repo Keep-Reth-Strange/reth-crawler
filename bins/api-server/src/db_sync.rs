@@ -31,7 +31,7 @@ async fn db_sync(update_time: i64, first_sync: bool) -> Result<(), Box<dyn Error
 
     // update sqliteDB from dynamoDB
     for peer in peers {
-        sqlite_db.add_peer(peer, None).await?;
+        sqlite_db.add_peer(peer).await?;
     }
 
     // prune data older than a day in the sqliteDB
