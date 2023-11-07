@@ -1,7 +1,7 @@
 mod crawler;
 mod p2p;
 use clap::{Args, Parser, Subcommand};
-use crawler::CrawlerFactory;
+use crawler::CrawlerBuilder;
 
 #[derive(Parser)]
 #[command(author, version)]
@@ -27,6 +27,10 @@ struct CrawlOpts {
     #[arg(long)]
     /// Use a sqlite db for local testing.
     local_db: bool,
+
+    /// Eth RPC url to use for getting full blocks and determining whether or not a node is synced
+    #[arg(long, default_value = "http://localhost:8545")]
+    eth_rpc_url: String,
 }
 
 #[tokio::main]
@@ -37,9 +41,15 @@ async fn main() {
 
     match &cli.command {
         Commands::Crawl(opts) => {
-            let (_, _, _) = CrawlerFactory::new()
-                .await
-                .make(opts.local_db)
+            let builder = if opts.local_db {
+                CrawlerBuilder::default().with_local_db()
+            } else {
+                CrawlerBuilder::default().without_local_db()
+            };
+
+            let (_, _, _) = builder
+                .with_eth_rpc_url(opts.eth_rpc_url.clone())
+                .build()
                 .await
                 .run()
                 .await;
