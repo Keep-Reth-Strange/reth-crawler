@@ -139,10 +139,6 @@ impl UpdateListener {
                         return;
                     }
 
-                    let ttl = Utc::now()
-                        .checked_add_days(Days::new(3))
-                        .unwrap()
-                        .timestamp();
                     let last_seen = Utc::now().to_string();
 
                     info!(
@@ -218,7 +214,7 @@ impl UpdateListener {
                         city,
                         synced,
                     };
-                    save_peer(peer_data, db, ttl).await;
+                    save_peer(peer_data, db).await;
                 });
             }
         }
@@ -297,10 +293,6 @@ impl UpdateListener {
                     captured_discv4.ban_ip(peer.address);
                     return;
                 }
-                let ttl = Utc::now()
-                    .checked_add_days(Days::new(3))
-                    .unwrap()
-                    .timestamp();
                 let last_seen = Utc::now().to_string();
 
                 info!(
@@ -375,7 +367,7 @@ impl UpdateListener {
                     city,
                     synced,
                 };
-                save_peer(peer_data, db, ttl).await;
+                save_peer(peer_data, db).await;
             });
         }
         Ok(())
@@ -417,10 +409,6 @@ impl UpdateListener {
                         let total_difficulty = status.total_difficulty.to_string();
                         let best_block = status.blockhash.to_string();
                         let genesis_block_hash = status.genesis.to_string();
-                        let ttl = Utc::now()
-                            .checked_add_days(Days::new(3))
-                            .unwrap()
-                            .timestamp();
                         let last_seen = Utc::now().to_string();
                         let mut country = String::default();
                         let mut city = String::default();
@@ -481,7 +469,7 @@ impl UpdateListener {
                             city,
                             synced,
                         };
-                        save_peer(peer_data, db, ttl).await;
+                        save_peer(peer_data, db).await;
                     });
                 }
                 NetworkEvent::PeerAdded(_) | NetworkEvent::PeerRemoved(_) => {}

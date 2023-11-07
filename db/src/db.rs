@@ -12,7 +12,7 @@ use tracing::info;
 
 #[async_trait]
 pub trait PeerDB: Send + Sync {
-    async fn add_peer(&self, peer_data: PeerData, ttl: Option<i64>) -> Result<(), AddItemError>;
+    async fn add_peer(&self, peer_data: PeerData) -> Result<(), AddItemError>;
     async fn all_peers(&self, page_size: Option<i32>) -> Result<Vec<PeerData>, ScanTableError>;
     async fn node_by_id(&self, id: String) -> Result<Option<Vec<PeerData>>, QueryItemError>;
     async fn node_by_ip(&self, ip: String) -> Result<Option<Vec<PeerData>>, QueryItemError>;
@@ -63,7 +63,7 @@ impl AwsPeerDB {
 
 #[async_trait]
 impl PeerDB for AwsPeerDB {
-    async fn add_peer(&self, peer_data: PeerData, ttl: Option<i64>) -> Result<(), AddItemError> {
+    async fn add_peer(&self, peer_data: PeerData) -> Result<(), AddItemError> {
         let capabilities = peer_data
             .capabilities
             .iter()
@@ -82,7 +82,6 @@ impl PeerDB for AwsPeerDB {
         let city = AttributeValue::S(peer_data.city);
         let last_seen = AttributeValue::S(peer_data.last_seen);
         let region_source = AttributeValue::S(self.client.config().region().unwrap().to_string());
-        let ttl = AttributeValue::N(ttl.unwrap().to_string());
         let capabilities = AttributeValue::L(capabilities);
         let eth_version = AttributeValue::N(peer_data.eth_version.to_string());
         let synced = if let Some(synced) = peer_data.synced {
@@ -110,7 +109,6 @@ impl PeerDB for AwsPeerDB {
             .item("genesis_block_hash", genesis_hash)
             .item("best_block", best_block)
             .item("total_difficulty", total_difficulty)
-            .item("ttl", ttl)
             .item("synced", synced)
             .send()
             .await
@@ -200,7 +198,7 @@ impl InMemoryPeerDB {
 
 #[async_trait]
 impl PeerDB for InMemoryPeerDB {
-    async fn add_peer(&self, peer_data: PeerData, _: Option<i64>) -> Result<(), AddItemError> {
+    async fn add_peer(&self, peer_data: PeerData) -> Result<(), AddItemError> {
         let mut db = self
             .db
             .write()
@@ -288,7 +286,7 @@ impl SqlPeerDB {
 
 #[async_trait]
 impl PeerDB for SqlPeerDB {
-    async fn add_peer(&self, peer_data: PeerData, _: Option<i64>) -> Result<(), AddItemError> {
+    async fn add_peer(&self, peer_data: PeerData) -> Result<(), AddItemError> {
         self.db
             .call(move |conn| {
                 conn.execute(
