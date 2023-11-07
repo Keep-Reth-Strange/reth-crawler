@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use crate::p2p::{handshake_eth, handshake_p2p};
-use chrono::{Days, Utc};
+use chrono::Utc;
 use ethers::providers::{Http, Middleware, Provider};
 use ethers::types::H256;
 use futures::StreamExt;
@@ -14,7 +14,7 @@ use reth_network::{NetworkEvent, NetworkHandle};
 use reth_primitives::{NodeRecord, PeerId};
 use secp256k1::SecretKey;
 use tokio::sync::mpsc::UnboundedSender;
-use tracing::{debug, info};
+use tracing::info;
 
 pub struct UpdateListener {
     discv4: Discv4,
@@ -69,6 +69,7 @@ impl UpdateListener {
     pub async fn start_discv4(&self) -> eyre::Result<()> {
         let mut discv4_stream = self.discv4.update_stream().await?;
         let key = self.key;
+        info!("discv4 is starting...");
         while let Some(update) = discv4_stream.next().await {
             let provider = self.provider.clone();
             let db = self.db.clone();
@@ -90,14 +91,14 @@ impl UpdateListener {
                         Err(e) => {
                             info!("Failed P2P handshake with peer {}, {}", peer.address, e);
                             if e.to_string().contains("Too many peers") {
-                                debug!("Skip counting p2p_failure for peer: {}", peer.address);
+                                info!("Skip counting p2p_failure for peer: {}", peer.address);
                                 return;
                             }
                             p2p_failure_count = p2p_failure_count + 1;
                             if p2p_failure_count >= P2P_FAILURE_THRESHOLD as u64 {
                                 // ban this peer - TODO: we probably want Discv4Service::ban_until() semantics here, but that isn't exposed to us
                                 // for now - permaban
-                                debug!(
+                                info!(
                                     "PeerId {} has failed p2p handshake {} times, banning",
                                     peer.id, p2p_failure_count
                                 );
@@ -178,9 +179,7 @@ impl UpdateListener {
                     // check if peer is synced with the latest chain's blocks
                     let mut synced = None;
                     if let Ok(last_block_number) = provider.get_block_number().await {
-                        info!("last block number: {}", last_block_number);
                         let peer_best_block_hash = Into::<H256>::into(their_status.blockhash.0);
-                        info!("peer best block hash: {:#?}", peer_best_block_hash);
                         if let Ok(Some(peer_best_block)) =
                             provider.get_block(peer_best_block_hash).await
                         {
@@ -191,8 +190,6 @@ impl UpdateListener {
                             } else {
                                 synced = Some(true);
                             }
-                            info!("peer best block number: {}", peer_best_block_number);
-                            info!("sync: {}", synced.unwrap());
                         }
                     }
 
@@ -224,6 +221,7 @@ impl UpdateListener {
     pub async fn start_dnsdisc(&self) -> eyre::Result<()> {
         let mut dnsdisc_update_stream = self.dnsdisc.node_record_stream().await?;
         let key = self.key;
+        info!("dnsdisc is starting...");
         while let Some(update) = dnsdisc_update_stream.next().await {
             let provider = self.provider.clone();
             let db = self.db.clone();
@@ -245,14 +243,14 @@ impl UpdateListener {
                     Err(e) => {
                         info!("Failed P2P handshake with peer {}, {}", peer.address, e);
                         if e.to_string().contains("Too many peers") {
-                            debug!("Skip counting p2p_failure for peer: {}", peer.address);
+                            info!("Skip counting p2p_failure for peer: {}", peer.address);
                             return;
                         }
                         p2p_failure_count = p2p_failure_count + 1;
                         if p2p_failure_count >= P2P_FAILURE_THRESHOLD as u64 {
                             // ban this peer - TODO: we probably want Discv4Service::ban_until() semantics here, but that isn't exposed to us
                             // for now - permaban
-                            debug!(
+                            info!(
                                 "PeerId {} has failed p2p handshake {} times, banning",
                                 peer.id, p2p_failure_count
                             );
@@ -285,7 +283,7 @@ impl UpdateListener {
                     }
                 };
                 if their_hello.client_version.is_empty() {
-                    debug!(
+                    info!(
                         "Peer {} with empty client_version - returning",
                         peer.address
                     );
@@ -331,9 +329,7 @@ impl UpdateListener {
                 // check if peer is synced with the latest chain's blocks
                 let mut synced = None;
                 if let Ok(last_block_number) = provider.get_block_number().await {
-                    info!("last block number: {}", last_block_number);
                     let peer_best_block_hash = Into::<H256>::into(their_status.blockhash.0);
-                    info!("peer best block hash: {:#?}", peer_best_block_hash);
                     if let Ok(Some(peer_best_block)) =
                         provider.get_block(peer_best_block_hash).await
                     {
@@ -344,8 +340,6 @@ impl UpdateListener {
                         } else {
                             synced = Some(true);
                         }
-                        info!("peer best block number: {}", peer_best_block_number);
-                        info!("sync: {}", synced.unwrap());
                     }
                 }
 
@@ -375,7 +369,7 @@ impl UpdateListener {
 
     pub async fn start_network(&self) {
         let mut net_events = self.network.event_listener();
-
+        info!("network is starting...");
         while let Some(event) = net_events.next().await {
             match event {
                 NetworkEvent::SessionEstablished {
@@ -427,16 +421,14 @@ impl UpdateListener {
                         // these peers inflate our numbers, same IP multiple generated ID
                         // TODO: ban them, but this isn't controlled by disc, and ban_ip semantics don't seem public to peers/network handles (?) - maybe peer_handle::reputation_change
                         if client_version.is_empty() {
-                            debug!("Peer {} with empty client_version - returning", ip_addr);
+                            info!("Peer {} with empty client_version - returning", ip_addr);
                             return;
                         }
 
                         // check if peer is synced with the latest chain's blocks
                         let mut synced = None;
                         if let Ok(last_block_number) = provider.get_block_number().await {
-                            info!("last block number: {}", last_block_number);
                             let peer_best_block_hash = Into::<H256>::into(status.blockhash.0);
-                            info!("peer best block hash: {:#?}", peer_best_block_hash);
                             if let Ok(Some(peer_best_block)) =
                                 provider.get_block(peer_best_block_hash).await
                             {
@@ -447,8 +439,6 @@ impl UpdateListener {
                                 } else {
                                     synced = Some(true);
                                 }
-                                info!("peer best block number: {}", peer_best_block_number);
-                                info!("sync: {}", synced.unwrap());
                             }
                         }
 
