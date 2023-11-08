@@ -1,13 +1,15 @@
 use std::collections::HashMap;
 use std::num::NonZeroUsize;
+use std::pin::Pin;
 use std::sync::{Arc, RwLock};
+use std::task::{Context, Poll};
 use std::time::Duration;
 
 use crate::p2p::{handshake_eth, handshake_p2p};
 use chrono::Utc;
-use ethers::providers::{Middleware, Provider, Ws};
-use ethers::types::{H256, U64};
-use futures::StreamExt;
+use ethers::providers::{Middleware, Provider, SubscriptionStream, Ws};
+use ethers::types::{Block, H256, U64};
+use futures::{Future, FutureExt, StreamExt};
 use ipgeolocate::{Locator, Service};
 use lru::LruCache;
 use reth_crawler_db::{save_peer, AwsPeerDB, PeerDB, PeerData, SqlPeerDB};
@@ -16,7 +18,11 @@ use reth_dns_discovery::{DnsDiscoveryHandle, DnsNodeRecordUpdate};
 use reth_network::{NetworkEvent, NetworkHandle};
 use reth_primitives::{NodeRecord, PeerId};
 use secp256k1::SecretKey;
+use tokio::sync::mpsc::{self, UnboundedSender};
+use tokio::sync::oneshot;
 use tokio::time;
+use tokio_stream::wrappers::UnboundedReceiverStream;
+use tokio_stream::Stream;
 use tracing::info;
 
 const P2P_FAILURE_THRESHOLD: u8 = 5;
@@ -32,23 +38,123 @@ pub struct UpdateListener {
     key: SecretKey,
     db: Arc<dyn PeerDB>,
     p2p_failures: Arc<RwLock<HashMap<PeerId, u64>>>,
-    provider: Provider<Ws>,
     state: BlockHashNum,
 }
 
 /// This holds the mapping between block hash and block number of the latest `SYNCED_THRESHOLD` blocks.
-#[derive(Debug, Clone)]
-pub struct BlockHashNum {
-    pub blocks_hash_to_number: Arc<RwLock<LruCache<H256, U64>>>,
+pub struct BlockHashNum<S>
+where
+    S: Stream + Unpin,
+{
+    /// Inner chache for mapping block hashes to block numbers.
+    blocks_hash_to_number: LruCache<H256, U64>,
+    /// Inner provider to use for block requests.
+    provider: Provider<Ws>,
+    /// Receiver half of the channel for block requests
+    command_rx: UnboundedReceiverStream<HashRequest>,
+    /// Copy of the sender half of the channel so handles can be created on demand.
+    service_tx: UnboundedSender<HashRequest>,
+    /// Block subscription stream.
+    block_subscription: S,
 }
 
-impl Default for BlockHashNum {
-    fn default() -> Self {
-        Self {
-            blocks_hash_to_number: Arc::new(RwLock::new(LruCache::new(
+impl<S> BlockHashNum<S>
+where
+    S: Stream + Unpin,
+{
+    /// Create a new service to resolve and cache block hashes / numbers mapping.
+    pub async fn new(provider_url: &str) -> (Self, BlockHashNumHandle) {
+        let (service_tx, command_rx) = mpsc::unbounded_channel();
+        let provider = Provider::<Ws>::connect(provider_url)
+            .await
+            .expect("Provider must work correctly!");
+        let block_subscription = provider
+            .subscribe_blocks()
+            .await
+            .expect("Subscription should be created");
+        let service = Self {
+            blocks_hash_to_number: LruCache::new(
                 NonZeroUsize::new(SYNCED_THRESHOLD as usize).expect("it's not zero!"),
-            ))),
+            ),
+            provider,
+            command_rx: UnboundedReceiverStream::new(command_rx),
+            service_tx,
+            block_subscription,
+        };
+
+        let handle = service.handle();
+
+        (service, handle)
+    }
+
+    /// Returns a handle to the service.
+    pub fn handle(&self) -> BlockHashNumHandle {
+        BlockHashNumHandle::new(self.service_tx.clone())
+    }
+}
+
+pub struct HashRequest {
+    /// The requested hash.
+    hash: H256,
+    /// The channel for returning the response.
+    response: oneshot::Sender<u64>,
+}
+
+impl<S> Future for BlockHashNum<S>
+where
+    S: Stream + Unpin,
+{
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.get_mut();
+
+        // backfill the blocks
+        /*
+               let last_block_number = this.provider.get_block_number().await?;
+               for block_number in
+                   (last_block_number.as_u64() - SYNCED_THRESHOLD)..=last_block_number.as_u64()
+               {
+                   let block = this
+                       .provider
+                       .get_block(block_number)
+                       .await?
+                       .expect("it's not a pending block");
+                   let block_hash = block.hash.expect("it's not a pending block");
+                   let block_number = block.number.expect("it's not a pending block");
+                   this.blocks_hash_to_number.put(block_hash, block_number);
+               }
+        */
+        while let Poll::Ready(Some(request)) = this.command_rx.poll_next_unpin(cx) {
+            // this represents receiving a request from the handle, check the mapping, or do some provider stuff to get a mapping and insert into the cache
         }
+
+        while let Poll::Ready(Some(block)) = this.block_subscription.poll_next_unpin(cx) {
+            // handle new block updates here
+            let block_hash = 
+        }
+
+        todo!()
+    }
+}
+
+/// A clone-able handle that sends requests to the block hash to num service
+pub struct BlockHashNumHandle {
+    /// Sender half of the message channel.
+    to_service: mpsc::UnboundedSender<HashRequest>,
+}
+
+impl BlockHashNumHandle {
+    pub(crate) fn new(to_service: mpsc::UnboundedSender<HashRequest>) -> Self {
+        Self { to_service }
+    }
+
+    // block hash to num method here, which just sends a HashRequest in the channel
+    pub async fn block_hash_to_num(&self, hash: H256) -> eyre::Result<u64> {
+        let (tx, rx) = oneshot::channel();
+        let hash_request = HashRequest { hash, response: tx };
+        self.to_service.send(hash_request)?;
+        rx.await.map_err(|err| err.into())
     }
 }
 
@@ -486,48 +592,5 @@ impl UpdateListener {
                 }
             }
         }
-    }
-
-    pub async fn start_state(&self) -> eyre::Result<()> {
-        let mut stream = self.provider.subscribe_blocks().await?;
-
-        while let Some(block) = stream.next().await {
-            let block_hash = block.hash.expect("it's not a pending block");
-            let block_number = block.number.expect("it's not a pending block");
-            {
-                let mut blocks_hash_to_number = self
-                    .state
-                    .blocks_hash_to_number
-                    .write()
-                    .expect("this should always work!");
-                blocks_hash_to_number.put(block_hash, block_number);
-            }
-        }
-        Ok(())
-    }
-
-    pub async fn initialize_state(&self) -> eyre::Result<()> {
-        let last_block_number = self.provider.get_block_number().await?;
-        for block_number in
-            (last_block_number.as_u64() - SYNCED_THRESHOLD)..=last_block_number.as_u64()
-        {
-            let block = self
-                .provider
-                .get_block(block_number)
-                .await?
-                .expect("it's not a pending block");
-            let block_hash = block.hash.expect("it's not a pending block");
-            let block_number = block.number.expect("it's not a pending block");
-            {
-                let mut blocks_hash_to_number = self
-                    .state
-                    .blocks_hash_to_number
-                    .write()
-                    .expect("this should always work!");
-                blocks_hash_to_number.put(block_hash, block_number);
-            }
-        }
-
-        Ok(())
     }
 }
