@@ -1,12 +1,15 @@
 use std::collections::HashMap;
+use std::num::NonZeroUsize;
 use std::sync::{Arc, RwLock};
+use std::time::Duration;
 
 use crate::p2p::{handshake_eth, handshake_p2p};
 use chrono::Utc;
-use ethers::providers::{Http, Middleware, Provider};
-use ethers::types::H256;
+use ethers::providers::{Http, Middleware, Provider, Ws};
+use ethers::types::{H256, U64};
 use futures::StreamExt;
 use ipgeolocate::{Locator, Service};
+use lru::LruCache;
 use reth_crawler_db::{save_peer, AwsPeerDB, PeerDB, PeerData, SqlPeerDB};
 use reth_discv4::{DiscoveryUpdate, Discv4};
 use reth_dns_discovery::{DnsDiscoveryHandle, DnsNodeRecordUpdate};
@@ -14,7 +17,14 @@ use reth_network::{NetworkEvent, NetworkHandle};
 use reth_primitives::{NodeRecord, PeerId};
 use secp256k1::SecretKey;
 use tokio::sync::mpsc::UnboundedSender;
+use tokio::time;
 use tracing::info;
+
+const P2P_FAILURE_THRESHOLD: u8 = 5;
+/// How many blocks can a node be lagging and still be considered `synced`.
+const SYNCED_THRESHOLD: u64 = 100;
+/// Stop the async tasks for this duration in seconds so that the state could be properly initialized!
+const SLEEP_TIME: u64 = 12;
 
 pub struct UpdateListener {
     discv4: Discv4,
@@ -23,12 +33,25 @@ pub struct UpdateListener {
     key: SecretKey,
     db: Arc<dyn PeerDB>,
     p2p_failures: Arc<RwLock<HashMap<PeerId, u64>>>,
-    provider: Provider<Http>,
+    provider: Provider<Ws>,
+    state: BlockHashNum,
 }
 
-const P2P_FAILURE_THRESHOLD: u8 = 5;
-/// How many blocks can a node be lagging and still be considered `synced`.
-const SYNCED_THRESHOLD: u64 = 100;
+/// This holds the mapping between block hash and block number of the latest `SYNCED_THRESHOLD` blocks.
+#[derive(Debug, Clone)]
+pub struct BlockHashNum {
+    pub blocks_hash_to_number: Arc<RwLock<LruCache<H256, U64>>>,
+}
+
+impl Default for BlockHashNum {
+    fn default() -> Self {
+        Self {
+            blocks_hash_to_number: Arc::new(RwLock::new(LruCache::new(
+                NonZeroUsize::new(SYNCED_THRESHOLD as usize).expect("it's not zero!"),
+            ))),
+        }
+    }
+}
 
 impl UpdateListener {
     pub async fn new(
@@ -42,7 +65,9 @@ impl UpdateListener {
     ) -> Self {
         let p2p_failures = Arc::from(RwLock::from(HashMap::new()));
         // initialize a new http provider
-        let provider = Provider::try_from(provider_url).expect("Provider must work correctly!");
+        let provider = Provider::<Ws>::connect(provider_url)
+            .await
+            .expect("Provider must work correctly!");
         if local_db {
             UpdateListener {
                 discv4,
@@ -52,6 +77,7 @@ impl UpdateListener {
                 network,
                 p2p_failures,
                 provider,
+                state: BlockHashNum::default(),
             }
         } else {
             UpdateListener {
@@ -62,16 +88,18 @@ impl UpdateListener {
                 network,
                 p2p_failures,
                 provider,
+                state: BlockHashNum::default(),
             }
         }
     }
 
     pub async fn start_discv4(&self) -> eyre::Result<()> {
+        time::sleep(Duration::from_secs(SLEEP_TIME)).await;
         let mut discv4_stream = self.discv4.update_stream().await?;
         let key = self.key;
         info!("discv4 is starting...");
         while let Some(update) = discv4_stream.next().await {
-            let provider = self.provider.clone();
+            let state = self.state.clone();
             let db = self.db.clone();
             let captured_discv4 = self.discv4.clone();
             let p2p_failures = self.p2p_failures.clone();
@@ -179,19 +207,16 @@ impl UpdateListener {
                     let genesis_block_hash = their_status.genesis.to_string();
 
                     // check if peer is synced with the latest chain's blocks
-                    let mut synced = None;
-                    if let Ok(last_block_number) = provider.get_block_number().await {
-                        let peer_best_block_hash = Into::<H256>::into(their_status.blockhash.0);
-                        if let Ok(Some(peer_best_block)) =
-                            provider.get_block(peer_best_block_hash).await
-                        {
-                            let peer_best_block_number =
-                                peer_best_block.number.expect("it's not a pending block!");
-                            if peer_best_block_number < last_block_number - SYNCED_THRESHOLD {
-                                synced = Some(false);
-                            } else {
-                                synced = Some(true);
-                            }
+                    let synced: Option<bool>;
+                    {
+                        let block_hash_to_num = state
+                            .blocks_hash_to_number
+                            .read()
+                            .expect("this should always work!");
+                        if block_hash_to_num.contains(&their_status.blockhash.0.into()) {
+                            synced = Some(true);
+                        } else {
+                            synced = Some(false);
                         }
                     }
 
@@ -222,11 +247,12 @@ impl UpdateListener {
     }
 
     pub async fn start_dnsdisc(&self) -> eyre::Result<()> {
+        time::sleep(Duration::from_secs(SLEEP_TIME)).await;
         let mut dnsdisc_update_stream = self.dnsdisc.node_record_stream().await?;
         let key = self.key;
         info!("dnsdisc is starting...");
         while let Some(update) = dnsdisc_update_stream.next().await {
-            let provider = self.provider.clone();
+            let state = self.state.clone();
             let db = self.db.clone();
             let p2p_failures = self.p2p_failures.clone();
             let captured_discv4 = self.discv4.clone();
@@ -332,19 +358,16 @@ impl UpdateListener {
                 let genesis_block_hash = their_status.genesis.to_string();
 
                 // check if peer is synced with the latest chain's blocks
-                let mut synced = None;
-                if let Ok(last_block_number) = provider.get_block_number().await {
-                    let peer_best_block_hash = Into::<H256>::into(their_status.blockhash.0);
-                    if let Ok(Some(peer_best_block)) =
-                        provider.get_block(peer_best_block_hash).await
-                    {
-                        let peer_best_block_number =
-                            peer_best_block.number.expect("it's not a pending block!");
-                        if peer_best_block_number < last_block_number - SYNCED_THRESHOLD {
-                            synced = Some(false);
-                        } else {
-                            synced = Some(true);
-                        }
+                let synced: Option<bool>;
+                {
+                    let block_hash_to_num = state
+                        .blocks_hash_to_number
+                        .read()
+                        .expect("this should always work!");
+                    if block_hash_to_num.contains(&their_status.blockhash.0.into()) {
+                        synced = Some(true);
+                    } else {
+                        synced = Some(false);
                     }
                 }
 
@@ -374,6 +397,7 @@ impl UpdateListener {
     }
 
     pub async fn start_network(&self) {
+        time::sleep(Duration::from_secs(SLEEP_TIME)).await;
         let mut net_events = self.network.event_listener();
         info!("network is starting...");
         while let Some(event) = net_events.next().await {
@@ -391,7 +415,7 @@ impl UpdateListener {
                         "Session Established with peer {}",
                         remote_addr.ip().to_string()
                     );
-                    let provider = self.provider.clone();
+                    let state = self.state.clone();
                     let db = self.db.clone();
                     let peer_handle = self.network.peers_handle().clone();
                     tokio::spawn(async move {
@@ -434,19 +458,16 @@ impl UpdateListener {
                         }
 
                         // check if peer is synced with the latest chain's blocks
-                        let mut synced = None;
-                        if let Ok(last_block_number) = provider.get_block_number().await {
-                            let peer_best_block_hash = Into::<H256>::into(status.blockhash.0);
-                            if let Ok(Some(peer_best_block)) =
-                                provider.get_block(peer_best_block_hash).await
-                            {
-                                let peer_best_block_number =
-                                    peer_best_block.number.expect("it's not a pending block!");
-                                if peer_best_block_number < last_block_number - SYNCED_THRESHOLD {
-                                    synced = Some(false);
-                                } else {
-                                    synced = Some(true);
-                                }
+                        let synced: Option<bool>;
+                        {
+                            let block_hash_to_num = state
+                                .blocks_hash_to_number
+                                .read()
+                                .expect("this should always work!");
+                            if block_hash_to_num.contains(&status.blockhash.0.into()) {
+                                synced = Some(true);
+                            } else {
+                                synced = Some(false);
                             }
                         }
 
@@ -483,5 +504,48 @@ impl UpdateListener {
                 }
             }
         }
+    }
+
+    pub async fn start_state(&self) -> eyre::Result<()> {
+        let mut stream = self.provider.subscribe_blocks().await?;
+
+        while let Some(block) = stream.next().await {
+            let block_hash = block.hash.expect("it's not a pending block");
+            let block_number = block.number.expect("it's not a pending block");
+            {
+                let mut blocks_hash_to_number = self
+                    .state
+                    .blocks_hash_to_number
+                    .write()
+                    .expect("this should always work!");
+                blocks_hash_to_number.put(block_hash, block_number);
+            }
+        }
+        Ok(())
+    }
+
+    pub async fn initialize_state(&self) -> eyre::Result<()> {
+        let last_block_number = self.provider.get_block_number().await?;
+        for block_number in
+            (last_block_number.as_u64() - SYNCED_THRESHOLD)..=last_block_number.as_u64()
+        {
+            let block = self
+                .provider
+                .get_block(block_number)
+                .await?
+                .expect("it's not a pending block");
+            let block_hash = block.hash.expect("it's not a pending block");
+            let block_number = block.number.expect("it's not a pending block");
+            {
+                let mut blocks_hash_to_number = self
+                    .state
+                    .blocks_hash_to_number
+                    .write()
+                    .expect("this should always work!");
+                blocks_hash_to_number.put(block_hash, block_number);
+            }
+        }
+
+        Ok(())
     }
 }

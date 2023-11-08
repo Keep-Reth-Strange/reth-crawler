@@ -28,8 +28,8 @@ struct CrawlOpts {
     /// Use a sqlite db for local testing.
     local_db: bool,
 
-    /// Eth RPC url to use for getting full blocks and determining whether or not a node is synced
-    #[arg(long, default_value = "http://localhost:8545")]
+    /// Eth RPC url to use for getting full blocks and determining whether or not a node is synced. It **MUST** be a web socket url.
+    #[arg(long, default_value = "wss://localhost:8546")]
     eth_rpc_url: String,
 }
 
@@ -47,7 +47,7 @@ async fn main() {
                 CrawlerBuilder::default().without_local_db()
             };
 
-            let (_, _, _) = builder
+            let (_, _, _, _) = builder
                 .with_eth_rpc_url(opts.eth_rpc_url.clone())
                 .build()
                 .await
