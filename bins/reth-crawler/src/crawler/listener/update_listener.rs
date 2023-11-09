@@ -1,10 +1,3 @@
-use std::collections::HashMap;
-use std::num::NonZeroUsize;
-use std::pin::Pin;
-use std::sync::{Arc, RwLock};
-use std::task::{Context, Poll};
-use std::time::Duration;
-
 use crate::p2p::{handshake_eth, handshake_p2p};
 use chrono::Utc;
 use ethers::providers::{Middleware, Provider, SubscriptionStream, Ws};
@@ -18,11 +11,16 @@ use reth_dns_discovery::{DnsDiscoveryHandle, DnsNodeRecordUpdate};
 use reth_network::{NetworkEvent, NetworkHandle};
 use reth_primitives::{NodeRecord, PeerId};
 use secp256k1::SecretKey;
+use std::collections::HashMap;
+use std::num::NonZeroUsize;
+use std::pin::Pin;
+use std::sync::{Arc, RwLock};
+use std::task::{Context, Poll};
+use std::time::Duration;
 use tokio::sync::mpsc::{self, UnboundedSender};
 use tokio::sync::oneshot;
 use tokio::time;
 use tokio_stream::wrappers::UnboundedReceiverStream;
-use tokio_stream::Stream;
 use tracing::info;
 
 const P2P_FAILURE_THRESHOLD: u8 = 5;
@@ -31,24 +29,19 @@ const SYNCED_THRESHOLD: u64 = 100;
 /// Stop the async tasks for this duration in seconds so that the state could be properly initialized!
 const SLEEP_TIME: u64 = 12;
 
-pub struct UpdateListener<S>
-where
-    S: Stream<Item = Block<H256>> + Unpin,
-{
+pub struct UpdateListener {
     discv4: Discv4,
     dnsdisc: DnsDiscoveryHandle,
     network: NetworkHandle,
     key: SecretKey,
     db: Arc<dyn PeerDB>,
     p2p_failures: Arc<RwLock<HashMap<PeerId, u64>>>,
-    state: BlockHashNum<S>,
+    state_handle: BlockHashNumHandle,
+    state: BlockHashNum,
 }
 
 /// This holds the mapping between block hash and block number of the latest `SYNCED_THRESHOLD` blocks.
-pub struct BlockHashNum<S>
-where
-    S: Stream<Item = Block<H256>> + Unpin,
-{
+pub struct BlockHashNum {
     /// Inner chache for mapping block hashes to block numbers.
     blocks_hash_to_number: LruCache<H256, U64>,
     /// Inner provider to use for block requests.
@@ -58,23 +51,16 @@ where
     /// Copy of the sender half of the channel so handles can be created on demand.
     service_tx: UnboundedSender<HashRequest>,
     /// Block subscription stream.
-    block_subscription: S,
+    block_subscription: SubscriptionStream<'static, Ws, Block<H256>>,
 }
 
-impl<S> BlockHashNum<S>
-where
-    S: Stream<Item = Block<H256>> + Unpin,
-{
+impl BlockHashNum {
     /// Create a new service to resolve and cache block hashes / numbers mapping.
-    pub async fn new(provider_url: &str) -> (Self, BlockHashNumHandle) {
+    pub fn new(
+        provider: Provider<Ws>,
+        block_subscription: SubscriptionStream<'static, Ws, Block<H256>>,
+    ) -> (Self, BlockHashNumHandle) {
         let (service_tx, command_rx) = mpsc::unbounded_channel();
-        let provider = Provider::<Ws>::connect(provider_url)
-            .await
-            .expect("Provider must work correctly!");
-        let block_subscription = provider
-            .subscribe_blocks()
-            .await
-            .expect("Block subscription must be created");
         let service = Self {
             blocks_hash_to_number: LruCache::new(
                 NonZeroUsize::new(SYNCED_THRESHOLD as usize).expect("it's not zero!"),
@@ -96,7 +82,7 @@ where
     }
 
     /// Backfill the inner LRU with the latest `SYNCED_THRESHOLD` blocks.
-    pub async fn initialize(&self) -> eyre::Result<()> {
+    pub async fn initialize(&mut self) -> eyre::Result<()> {
         let last_block_number = self.provider.get_block_number().await?;
         for block_number in
             (last_block_number.as_u64() - SYNCED_THRESHOLD)..=last_block_number.as_u64()
@@ -121,10 +107,7 @@ pub struct HashRequest {
     response: oneshot::Sender<bool>,
 }
 
-impl<S> Future for BlockHashNum<S>
-where
-    S: Stream<Item = Block<H256>> + Unpin,
-{
+impl Future for BlockHashNum {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -134,7 +117,7 @@ where
             // check if request.hash is inside the inner LRU
             let HashRequest { hash, response } = request;
             let is_present = this.blocks_hash_to_number.contains(&hash);
-            response.send(is_present);
+            let _ = response.send(is_present);
         }
 
         while let Poll::Ready(Some(block)) = this.block_subscription.poll_next_unpin(cx) {
@@ -145,11 +128,12 @@ where
             this.blocks_hash_to_number.put(block_hash, block_number);
         }
 
-        todo!()
+        Poll::Pending
     }
 }
 
 /// A clone-able handle that sends requests to the block hash to num service
+#[derive(Clone)]
 pub struct BlockHashNumHandle {
     /// Sender half of the message channel.
     to_service: mpsc::UnboundedSender<HashRequest>,
@@ -170,10 +154,7 @@ impl BlockHashNumHandle {
     }
 }
 
-impl<S> UpdateListener<S>
-where
-    S: Stream<Item = Block<H256>> + Unpin,
-{
+impl UpdateListener {
     pub async fn new(
         discv4: Discv4,
         dnsdisc: DnsDiscoveryHandle,
@@ -181,9 +162,19 @@ where
         key: SecretKey,
         local_db: bool,
         provider_url: String,
-    ) -> Self {
+    ) -> UpdateListener {
         let p2p_failures = Arc::from(RwLock::from(HashMap::new()));
         // initialize a new http provider
+        let provider = Provider::<Ws>::connect(provider_url)
+            .await
+            .expect("Provider must work correctly!");
+        // create block subscription
+        let block_subscription = provider
+            .subscribe_blocks()
+            .await
+            .expect("Block subscription must be created");
+        // create `BlockHashNum`
+        let (state, state_handle) = BlockHashNum::new(provider.clone(), block_subscription);
         if local_db {
             UpdateListener {
                 discv4,
@@ -192,7 +183,8 @@ where
                 db: Arc::new(SqlPeerDB::new().await),
                 network,
                 p2p_failures,
-                state: BlockHashNum::new(&provider_url).await,
+                state_handle,
+                state,
             }
         } else {
             UpdateListener {
@@ -202,7 +194,8 @@ where
                 db: Arc::new(AwsPeerDB::new().await),
                 network,
                 p2p_failures,
-                state: BlockHashNum::new(&provider_url).await,
+                state_handle,
+                state,
             }
         }
     }
@@ -213,6 +206,7 @@ where
         let key = self.key;
         info!("discv4 is starting...");
         while let Some(update) = discv4_stream.next().await {
+            let state_handle = self.state_handle.clone();
             let db = self.db.clone();
             let captured_discv4 = self.discv4.clone();
             let p2p_failures = self.p2p_failures.clone();
@@ -315,6 +309,14 @@ where
 
                     // check if peer is synced with the latest chain's blocks
                     let synced: Option<bool>;
+                    if let Ok(result) = state_handle
+                        .is_block_hash_present(their_status.blockhash.0.into())
+                        .await
+                    {
+                        synced = Some(result);
+                    } else {
+                        synced = None;
+                    }
 
                     // collect data into `PeerData`
                     let peer_data = PeerData {
@@ -348,7 +350,7 @@ where
         let key = self.key;
         info!("dnsdisc is starting...");
         while let Some(update) = dnsdisc_update_stream.next().await {
-            let state = self.state.clone();
+            let state_handle = self.state_handle.clone();
             let db = self.db.clone();
             let p2p_failures = self.p2p_failures.clone();
             let captured_discv4 = self.discv4.clone();
@@ -450,16 +452,13 @@ where
 
                 // check if peer is synced with the latest chain's blocks
                 let synced: Option<bool>;
+                if let Ok(result) = state_handle
+                    .is_block_hash_present(their_status.blockhash.0.into())
+                    .await
                 {
-                    let block_hash_to_num = state
-                        .blocks_hash_to_number
-                        .read()
-                        .expect("this should always work!");
-                    if block_hash_to_num.contains(&their_status.blockhash.0.into()) {
-                        synced = Some(true);
-                    } else {
-                        synced = Some(false);
-                    }
+                    synced = Some(result);
+                } else {
+                    synced = None;
                 }
 
                 // collect data into `PeerData`
@@ -506,7 +505,7 @@ where
                         "Session Established with peer {}",
                         remote_addr.ip().to_string()
                     );
-                    let state = self.state.clone();
+                    let state_handle = self.state_handle.clone();
                     let db = self.db.clone();
                     let peer_handle = self.network.peers_handle().clone();
                     tokio::spawn(async move {
@@ -545,16 +544,13 @@ where
 
                         // check if peer is synced with the latest chain's blocks
                         let synced: Option<bool>;
+                        if let Ok(result) = state_handle
+                            .is_block_hash_present(status.blockhash.0.into())
+                            .await
                         {
-                            let block_hash_to_num = state
-                                .blocks_hash_to_number
-                                .read()
-                                .expect("this should always work!");
-                            if block_hash_to_num.contains(&status.blockhash.0.into()) {
-                                synced = Some(true);
-                            } else {
-                                synced = Some(false);
-                            }
+                            synced = Some(result);
+                        } else {
+                            synced = None;
                         }
 
                         let peer_data = PeerData {
@@ -590,5 +586,10 @@ where
                 }
             }
         }
+    }
+
+    pub async fn initialize_state(&mut self) -> eyre::Result<()> {
+        self.state.initialize().await?;
+        Ok(())
     }
 }

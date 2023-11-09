@@ -1,4 +1,3 @@
-use ethers::types::{Block, H256};
 use once_cell::sync::Lazy;
 use reth_discv4::{Discv4, Discv4ConfigBuilder, DEFAULT_DISCOVERY_ADDRESS};
 use reth_dns_discovery::{DnsDiscoveryConfig, DnsDiscoveryService, DnsResolver};
@@ -10,7 +9,6 @@ use reth_provider::test_utils::NoopProvider;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio_stream::Stream;
 
 use crate::crawler::CrawlerService;
 
@@ -18,10 +16,7 @@ pub static MAINNET_BOOT_NODES: Lazy<Vec<NodeRecord>> = Lazy::new(mainnet_nodes);
 
 /// Builder for a [`CrawlerService`]
 #[derive(Clone, Debug)]
-pub struct CrawlerBuilder<S>
-where
-    S: Stream<Item = Block<H256>> + Unpin,
-{
+pub struct CrawlerBuilder {
     /// Whether or not to use a local db
     local_db: bool,
     /// Eth RPC url
@@ -32,14 +27,9 @@ where
     max_outbound: usize,
     /// The lookup interval for the crawler
     lookup_interval: Duration,
-    /// PhantomData marker
-    _marker: PhantomData<S>,
 }
 
-impl<S> Default for CrawlerBuilder<S>
-where
-    S: Stream<Item = Block<H256>> + Unpin,
-{
+impl Default for CrawlerBuilder {
     fn default() -> Self {
         Self {
             local_db: false,
@@ -47,15 +37,11 @@ where
             max_inbound: 10000,
             max_outbound: 0,
             lookup_interval: Duration::from_secs(3),
-            _marker: PhantomData,
         }
     }
 }
 
-impl<S> CrawlerBuilder<S>
-where
-    S: Stream<Item = Block<H256>> + Unpin,
-{
+impl CrawlerBuilder {
     /// Enable the local db
     pub fn with_local_db(mut self) -> Self {
         self.local_db = true;
@@ -75,7 +61,7 @@ where
     }
 
     /// Build the [`CrawlerService`]
-    pub async fn build(self) -> CrawlerService<S> {
+    pub async fn build(self) -> CrawlerService {
         // Ensure the rpc url is set
         let provider_url = self.eth_rpc_url.expect("eth rpc url must be provided");
 
