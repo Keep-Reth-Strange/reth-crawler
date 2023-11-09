@@ -31,20 +31,23 @@ const SYNCED_THRESHOLD: u64 = 100;
 /// Stop the async tasks for this duration in seconds so that the state could be properly initialized!
 const SLEEP_TIME: u64 = 12;
 
-pub struct UpdateListener {
+pub struct UpdateListener<S>
+where
+    S: Stream<Item = Block<H256>> + Unpin,
+{
     discv4: Discv4,
     dnsdisc: DnsDiscoveryHandle,
     network: NetworkHandle,
     key: SecretKey,
     db: Arc<dyn PeerDB>,
     p2p_failures: Arc<RwLock<HashMap<PeerId, u64>>>,
-    state: BlockHashNum,
+    state: BlockHashNum<S>,
 }
 
 /// This holds the mapping between block hash and block number of the latest `SYNCED_THRESHOLD` blocks.
 pub struct BlockHashNum<S>
 where
-    S: Stream + Unpin,
+    S: Stream<Item = Block<H256>> + Unpin,
 {
     /// Inner chache for mapping block hashes to block numbers.
     blocks_hash_to_number: LruCache<H256, U64>,
@@ -60,7 +63,7 @@ where
 
 impl<S> BlockHashNum<S>
 where
-    S: Stream + Unpin,
+    S: Stream<Item = Block<H256>> + Unpin,
 {
     /// Create a new service to resolve and cache block hashes / numbers mapping.
     pub async fn new(provider_url: &str) -> (Self, BlockHashNumHandle) {
@@ -71,7 +74,7 @@ where
         let block_subscription = provider
             .subscribe_blocks()
             .await
-            .expect("Subscription should be created");
+            .expect("Block subscription must be created");
         let service = Self {
             blocks_hash_to_number: LruCache::new(
                 NonZeroUsize::new(SYNCED_THRESHOLD as usize).expect("it's not zero!"),
@@ -91,47 +94,55 @@ where
     pub fn handle(&self) -> BlockHashNumHandle {
         BlockHashNumHandle::new(self.service_tx.clone())
     }
+
+    /// Backfill the inner LRU with the latest `SYNCED_THRESHOLD` blocks.
+    pub async fn initialize(&self) -> eyre::Result<()> {
+        let last_block_number = self.provider.get_block_number().await?;
+        for block_number in
+            (last_block_number.as_u64() - SYNCED_THRESHOLD)..=last_block_number.as_u64()
+        {
+            let block = self
+                .provider
+                .get_block(block_number)
+                .await?
+                .expect("it's not a pending block");
+            let block_hash = block.hash.expect("it's not a pending block");
+            let block_number = block.number.expect("it's not a pending block");
+            self.blocks_hash_to_number.put(block_hash, block_number);
+        }
+        Ok(())
+    }
 }
 
 pub struct HashRequest {
     /// The requested hash.
     hash: H256,
     /// The channel for returning the response.
-    response: oneshot::Sender<u64>,
+    response: oneshot::Sender<bool>,
 }
 
 impl<S> Future for BlockHashNum<S>
 where
-    S: Stream + Unpin,
+    S: Stream<Item = Block<H256>> + Unpin,
 {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.get_mut();
 
-        // backfill the blocks
-        /*
-               let last_block_number = this.provider.get_block_number().await?;
-               for block_number in
-                   (last_block_number.as_u64() - SYNCED_THRESHOLD)..=last_block_number.as_u64()
-               {
-                   let block = this
-                       .provider
-                       .get_block(block_number)
-                       .await?
-                       .expect("it's not a pending block");
-                   let block_hash = block.hash.expect("it's not a pending block");
-                   let block_number = block.number.expect("it's not a pending block");
-                   this.blocks_hash_to_number.put(block_hash, block_number);
-               }
-        */
         while let Poll::Ready(Some(request)) = this.command_rx.poll_next_unpin(cx) {
-            // this represents receiving a request from the handle, check the mapping, or do some provider stuff to get a mapping and insert into the cache
+            // check if request.hash is inside the inner LRU
+            let HashRequest { hash, response } = request;
+            let is_present = this.blocks_hash_to_number.contains(&hash);
+            response.send(is_present);
         }
 
         while let Poll::Ready(Some(block)) = this.block_subscription.poll_next_unpin(cx) {
             // handle new block updates here
-            let block_hash = 
+            let block_hash = block.hash.expect("it's not a pending block");
+            let block_number = block.number.expect("it's not a pending block");
+            // update inner LRU
+            this.blocks_hash_to_number.put(block_hash, block_number);
         }
 
         todo!()
@@ -145,12 +156,13 @@ pub struct BlockHashNumHandle {
 }
 
 impl BlockHashNumHandle {
+    /// Create a new `BlockHashNumHandle`.
     pub(crate) fn new(to_service: mpsc::UnboundedSender<HashRequest>) -> Self {
         Self { to_service }
     }
 
-    // block hash to num method here, which just sends a HashRequest in the channel
-    pub async fn block_hash_to_num(&self, hash: H256) -> eyre::Result<u64> {
+    /// Send a `HashRequest` in the channel.
+    pub async fn is_block_hash_present(&self, hash: H256) -> eyre::Result<bool> {
         let (tx, rx) = oneshot::channel();
         let hash_request = HashRequest { hash, response: tx };
         self.to_service.send(hash_request)?;
@@ -158,7 +170,10 @@ impl BlockHashNumHandle {
     }
 }
 
-impl UpdateListener {
+impl<S> UpdateListener<S>
+where
+    S: Stream<Item = Block<H256>> + Unpin,
+{
     pub async fn new(
         discv4: Discv4,
         dnsdisc: DnsDiscoveryHandle,
@@ -169,9 +184,6 @@ impl UpdateListener {
     ) -> Self {
         let p2p_failures = Arc::from(RwLock::from(HashMap::new()));
         // initialize a new http provider
-        let provider = Provider::<Ws>::connect(provider_url)
-            .await
-            .expect("Provider must work correctly!");
         if local_db {
             UpdateListener {
                 discv4,
@@ -180,8 +192,7 @@ impl UpdateListener {
                 db: Arc::new(SqlPeerDB::new().await),
                 network,
                 p2p_failures,
-                provider,
-                state: BlockHashNum::default(),
+                state: BlockHashNum::new(&provider_url).await,
             }
         } else {
             UpdateListener {
@@ -191,8 +202,7 @@ impl UpdateListener {
                 db: Arc::new(AwsPeerDB::new().await),
                 network,
                 p2p_failures,
-                provider,
-                state: BlockHashNum::default(),
+                state: BlockHashNum::new(&provider_url).await,
             }
         }
     }
@@ -203,7 +213,6 @@ impl UpdateListener {
         let key = self.key;
         info!("discv4 is starting...");
         while let Some(update) = discv4_stream.next().await {
-            let state = self.state.clone();
             let db = self.db.clone();
             let captured_discv4 = self.discv4.clone();
             let p2p_failures = self.p2p_failures.clone();
@@ -306,17 +315,6 @@ impl UpdateListener {
 
                     // check if peer is synced with the latest chain's blocks
                     let synced: Option<bool>;
-                    {
-                        let block_hash_to_num = state
-                            .blocks_hash_to_number
-                            .read()
-                            .expect("this should always work!");
-                        if block_hash_to_num.contains(&their_status.blockhash.0.into()) {
-                            synced = Some(true);
-                        } else {
-                            synced = Some(false);
-                        }
-                    }
 
                     // collect data into `PeerData`
                     let peer_data = PeerData {

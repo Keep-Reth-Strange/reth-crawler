@@ -47,7 +47,7 @@ async fn main() {
                 CrawlerBuilder::default().without_local_db()
             };
 
-            let (_, _, _, _) = builder
+            let (_, _, _) = builder
                 .with_eth_rpc_url(opts.eth_rpc_url.clone())
                 .build()
                 .await

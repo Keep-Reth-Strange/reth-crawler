@@ -1,3 +1,4 @@
+use ethers::types::{Block, H256};
 use once_cell::sync::Lazy;
 use reth_discv4::{Discv4, Discv4ConfigBuilder, DEFAULT_DISCOVERY_ADDRESS};
 use reth_dns_discovery::{DnsDiscoveryConfig, DnsDiscoveryService, DnsResolver};
@@ -6,8 +7,10 @@ use reth_network::config::rng_secret_key;
 use reth_network::{NetworkConfig, NetworkManager, PeersConfig};
 use reth_primitives::{mainnet_nodes, NodeRecord};
 use reth_provider::test_utils::NoopProvider;
+use std::marker::PhantomData;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio_stream::Stream;
 
 use crate::crawler::CrawlerService;
 
@@ -15,7 +18,10 @@ pub static MAINNET_BOOT_NODES: Lazy<Vec<NodeRecord>> = Lazy::new(mainnet_nodes);
 
 /// Builder for a [`CrawlerService`]
 #[derive(Clone, Debug)]
-pub struct CrawlerBuilder {
+pub struct CrawlerBuilder<S>
+where
+    S: Stream<Item = Block<H256>> + Unpin,
+{
     /// Whether or not to use a local db
     local_db: bool,
     /// Eth RPC url
@@ -26,9 +32,14 @@ pub struct CrawlerBuilder {
     max_outbound: usize,
     /// The lookup interval for the crawler
     lookup_interval: Duration,
+    /// PhantomData marker
+    _marker: PhantomData<S>,
 }
 
-impl Default for CrawlerBuilder {
+impl<S> Default for CrawlerBuilder<S>
+where
+    S: Stream<Item = Block<H256>> + Unpin,
+{
     fn default() -> Self {
         Self {
             local_db: false,
@@ -36,11 +47,15 @@ impl Default for CrawlerBuilder {
             max_inbound: 10000,
             max_outbound: 0,
             lookup_interval: Duration::from_secs(3),
+            _marker: PhantomData,
         }
     }
 }
 
-impl CrawlerBuilder {
+impl<S> CrawlerBuilder<S>
+where
+    S: Stream<Item = Block<H256>> + Unpin,
+{
     /// Enable the local db
     pub fn with_local_db(mut self) -> Self {
         self.local_db = true;
@@ -60,7 +75,7 @@ impl CrawlerBuilder {
     }
 
     /// Build the [`CrawlerService`]
-    pub async fn build(self) -> CrawlerService {
+    pub async fn build(self) -> CrawlerService<S> {
         // Ensure the rpc url is set
         let provider_url = self.eth_rpc_url.expect("eth rpc url must be provided");
 
