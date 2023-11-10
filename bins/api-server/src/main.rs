@@ -81,6 +81,6 @@ struct Message {
 
 async fn handler() -> Json<Message> {
     Json(Message {
-        message: format!("Hello, World!"),
+        message: "Hello World!".to_string(),
     })
 }

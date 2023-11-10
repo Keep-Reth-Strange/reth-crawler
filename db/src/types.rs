@@ -29,6 +29,7 @@ pub struct PeerData {
 }
 
 impl PeerData {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         enode_url: String,
         id: String,
@@ -57,11 +58,11 @@ impl PeerData {
             last_seen,
             country,
             city,
-            total_difficulty: total_difficulty,
+            total_difficulty,
             chain,
-            best_block: best_block,
+            best_block,
             eth_version,
-            genesis_block_hash: genesis_block_hash,
+            genesis_block_hash,
             synced,
             isp,
         }
