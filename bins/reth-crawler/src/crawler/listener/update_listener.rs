@@ -29,7 +29,7 @@ const SYNCED_THRESHOLD: u64 = 100;
 /// Stop the async tasks for this duration in seconds so that the state could be properly initialized!
 const SLEEP_TIME: u64 = 12;
 
-pub struct UpdateListener {
+pub struct UpdateListener<'a> {
     discv4: Discv4,
     dnsdisc: DnsDiscoveryHandle,
     network: NetworkHandle,
@@ -37,11 +37,11 @@ pub struct UpdateListener {
     db: Arc<dyn PeerDB>,
     p2p_failures: Arc<RwLock<HashMap<PeerId, u64>>>,
     state_handle: BlockHashNumHandle,
-    state: BlockHashNum,
+    state: BlockHashNum<'a>,
 }
 
 /// This holds the mapping between block hash and block number of the latest `SYNCED_THRESHOLD` blocks.
-pub struct BlockHashNum {
+pub struct BlockHashNum<'a> {
     /// Inner chache for mapping block hashes to block numbers.
     blocks_hash_to_number: LruCache<H256, U64>,
     /// Inner provider to use for block requests.
@@ -51,10 +51,10 @@ pub struct BlockHashNum {
     /// Copy of the sender half of the channel so handles can be created on demand.
     service_tx: UnboundedSender<HashRequest>,
     /// Block subscription stream.
-    block_subscription: SubscriptionStream<'static, Ws, Block<H256>>,
+    block_subscription: SubscriptionStream<'a, Ws, Block<H256>>,
 }
 
-impl BlockHashNum {
+impl<'a> BlockHashNum<'a> {
     /// Create a new service to resolve and cache block hashes / numbers mapping.
     pub fn new(
         provider: Provider<Ws>,
@@ -107,7 +107,7 @@ pub struct HashRequest {
     response: oneshot::Sender<bool>,
 }
 
-impl Future for BlockHashNum {
+impl<'a> Future for BlockHashNum<'a> {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -154,7 +154,7 @@ impl BlockHashNumHandle {
     }
 }
 
-impl UpdateListener {
+impl<'a> UpdateListener<'a> {
     pub async fn new(
         discv4: Discv4,
         dnsdisc: DnsDiscoveryHandle,
@@ -162,7 +162,7 @@ impl UpdateListener {
         key: SecretKey,
         local_db: bool,
         provider_url: String,
-    ) -> UpdateListener {
+    ) -> UpdateListener<'a> {
         let p2p_failures = Arc::from(RwLock::from(HashMap::new()));
         // initialize a new http provider
         let provider = Provider::<Ws>::connect(provider_url)

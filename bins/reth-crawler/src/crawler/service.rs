@@ -9,11 +9,11 @@ use tracing::info;
 
 use crate::crawler::listener::UpdateListener;
 
-pub struct CrawlerService {
-    updates: UpdateListener,
+pub struct CrawlerService<'a> {
+    updates: UpdateListener<'a>,
 }
 
-impl CrawlerService {
+impl<'a> CrawlerService<'a> {
     pub async fn new(
         discv4: Discv4,
         dnsdisc: DnsDiscoveryHandle,
@@ -21,7 +21,7 @@ impl CrawlerService {
         key: SecretKey,
         local_db: bool,
         provider_url: String,
-    ) -> CrawlerService {
+    ) -> CrawlerService<'a> {
         let updates =
             UpdateListener::new(discv4, dnsdisc, network, key, local_db, provider_url).await;
         Self { updates }

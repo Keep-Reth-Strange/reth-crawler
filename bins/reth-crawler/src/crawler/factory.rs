@@ -16,7 +16,7 @@ pub static MAINNET_BOOT_NODES: Lazy<Vec<NodeRecord>> = Lazy::new(mainnet_nodes);
 
 /// Builder for a [`CrawlerService`]
 #[derive(Clone, Debug)]
-pub struct CrawlerBuilder {
+pub struct CrawlerBuilder <'a>{
     /// Whether or not to use a local db
     local_db: bool,
     /// Eth RPC url
@@ -27,9 +27,11 @@ pub struct CrawlerBuilder {
     max_outbound: usize,
     /// The lookup interval for the crawler
     lookup_interval: Duration,
+    /// Marker for the lifetime parameter
+    _marker: PhantomData<&'a ()>,
 }
 
-impl Default for CrawlerBuilder {
+impl<'a> Default for CrawlerBuilder<'a> {
     fn default() -> Self {
         Self {
             local_db: false,
@@ -37,11 +39,12 @@ impl Default for CrawlerBuilder {
             max_inbound: 10000,
             max_outbound: 0,
             lookup_interval: Duration::from_secs(3),
+            _marker: PhantomData
         }
     }
 }
 
-impl CrawlerBuilder {
+impl<'a> CrawlerBuilder<'a> {
     /// Enable the local db
     pub fn with_local_db(mut self) -> Self {
         self.local_db = true;
@@ -61,7 +64,7 @@ impl CrawlerBuilder {
     }
 
     /// Build the [`CrawlerService`]
-    pub async fn build(self) -> CrawlerService {
+    pub async fn build(self) -> CrawlerService<'a> {
         // Ensure the rpc url is set
         let provider_url = self.eth_rpc_url.expect("eth rpc url must be provided");
 
