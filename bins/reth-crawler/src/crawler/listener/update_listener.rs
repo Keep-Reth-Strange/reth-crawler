@@ -58,7 +58,7 @@ impl<'a> BlockHashNum<'a> {
     /// Create a new service to resolve and cache block hashes / numbers mapping.
     pub fn new(
         provider: Provider<Ws>,
-        block_subscription: SubscriptionStream<'static, Ws, Block<H256>>,
+        block_subscription: SubscriptionStream<'a, Ws, Block<H256>>,
     ) -> (Self, BlockHashNumHandle) {
         let (service_tx, command_rx) = mpsc::unbounded_channel();
         let service = Self {
@@ -174,7 +174,7 @@ impl<'a> UpdateListener<'a> {
             .await
             .expect("Block subscription must be created");
         // create `BlockHashNum`
-        let (state, state_handle) = BlockHashNum::new(provider.clone(), block_subscription);
+        let (state, state_handle) = BlockHashNum::new(provider, block_subscription);
         if local_db {
             UpdateListener {
                 discv4,
