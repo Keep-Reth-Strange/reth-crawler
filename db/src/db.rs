@@ -1,14 +1,12 @@
-use crate::types::{AddItemError, DeleteItemError, PeerData, QueryItemError, ScanTableError};
+use crate::types::{AddItemError, PeerData, QueryItemError, ScanTableError};
 use async_trait::async_trait;
 use aws_config::meta::region::RegionProviderChain;
 use aws_sdk_dynamodb::types::AttributeValue;
 use aws_sdk_dynamodb::{config::Region, Client};
-use chrono::{Duration, Utc};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use tokio_rusqlite::Connection;
 use tokio_stream::StreamExt;
-use tracing::info;
 
 #[async_trait]
 pub trait PeerDB: Send + Sync {
@@ -122,15 +120,9 @@ impl PeerDB for AwsPeerDB {
 
     async fn all_peers(&self, page_size: Option<i32>) -> Result<Vec<PeerData>, ScanTableError> {
         let page_size = page_size.unwrap_or(1000);
-        let cutoff = Utc::now()
-            .checked_sub_signed(Duration::hours(72))
-            .unwrap()
-            .to_string();
         let results: Result<Vec<_>, _> = self
             .client
             .scan()
-            .filter_expression("last_seen > :last_seen_parameter")
-            .expression_attribute_values(":last_seen_parameter", AttributeValue::S(cutoff.clone()))
             .table_name("eth-peer-data")
             .limit(page_size)
             .into_paginator()
@@ -189,7 +181,7 @@ impl PeerDB for AwsPeerDB {
 pub struct InMemoryPeerDB {
     db: Arc<RwLock<HashMap<String, PeerData>>>,
 }
-
+#[allow(clippy::new_without_default)]
 impl InMemoryPeerDB {
     pub fn new() -> Self {
         Self {
@@ -315,11 +307,11 @@ impl PeerDB for SqlPeerDB {
                 )
             })
             .await
-            .map_err(|err| AddItemError::SqlAddItemError(err))?;
+            .map_err(AddItemError::SqlAddItemError)?;
         Ok(())
     }
 
-    async fn all_peers(&self, page_size: Option<i32>) -> Result<Vec<PeerData>, ScanTableError> {
+    async fn all_peers(&self, _page_size: Option<i32>) -> Result<Vec<PeerData>, ScanTableError> {
         let peers = self
             .db
             .call(move |conn| {
@@ -341,8 +333,7 @@ impl PeerDB for SqlPeerDB {
                         capabilities: row
                             .get::<_, String>(12)?
                             .as_str()
-                            .split(",")
-                            .into_iter()
+                            .split(',')
                             .map(|s| s.to_string())
                             .collect(),
                         eth_version: row.get(13)?,
@@ -351,15 +342,13 @@ impl PeerDB for SqlPeerDB {
                     })
                 })?;
                 let mut peers = vec![];
-                for row in rows {
-                    if let Ok(peer_data) = row {
-                        peers.push(peer_data);
-                    }
+                for peer_data in rows.flatten() {
+                    peers.push(peer_data);
                 }
                 Ok(peers)
             })
             .await
-            .map_err(|err| ScanTableError::SqlScanError(err))?;
+            .map_err(ScanTableError::SqlScanError)?;
 
         Ok(peers)
     }
@@ -386,8 +375,7 @@ impl PeerDB for SqlPeerDB {
                         capabilities: row
                             .get::<_, String>(12)?
                             .as_str()
-                            .split(",")
-                            .into_iter()
+                            .split(',')
                             .map(|s| s.to_string())
                             .collect(),
                         eth_version: row.get(13)?,
@@ -396,15 +384,13 @@ impl PeerDB for SqlPeerDB {
                     })
                 })?;
                 let mut peers = vec![];
-                for row in rows {
-                    if let Ok(peer_data) = row {
-                        peers.push(peer_data);
-                    }
+                for peer_data in rows.flatten() {
+                    peers.push(peer_data);
                 }
                 Ok(peers)
             })
             .await
-            .map_err(|err| QueryItemError::SqlQueryItemError(err))?;
+            .map_err(QueryItemError::SqlQueryItemError)?;
 
         Ok(Some(peers))
     }
@@ -431,8 +417,7 @@ impl PeerDB for SqlPeerDB {
                         capabilities: row
                             .get::<_, String>(12)?
                             .as_str()
-                            .split(",")
-                            .into_iter()
+                            .split(',')
                             .map(|s| s.to_string())
                             .collect(),
                         eth_version: row.get(13)?,
@@ -441,15 +426,13 @@ impl PeerDB for SqlPeerDB {
                     })
                 })?;
                 let mut peers = vec![];
-                for row in rows {
-                    if let Ok(peer_data) = row {
-                        peers.push(peer_data);
-                    }
+                for peer_data in rows.flatten() {
+                    peers.push(peer_data);
                 }
                 Ok(peers)
             })
             .await
-            .map_err(|err| QueryItemError::SqlQueryItemError(err))?;
+            .map_err(QueryItemError::SqlQueryItemError)?;
 
         Ok(Some(peers))
     }

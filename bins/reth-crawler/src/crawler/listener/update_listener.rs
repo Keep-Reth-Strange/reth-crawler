@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use crate::p2p::{handshake_eth, handshake_p2p};
 use chrono::Utc;
-use ethers::providers::{Http, Middleware, Provider, Ws};
+use ethers::providers::{Middleware, Provider, Ws};
 use ethers::types::{H256, U64};
 use futures::StreamExt;
 use ipgeolocate::{Locator, Service};
@@ -16,7 +16,6 @@ use reth_dns_discovery::{DnsDiscoveryHandle, DnsNodeRecordUpdate};
 use reth_network::{NetworkEvent, NetworkHandle};
 use reth_primitives::{NodeRecord, PeerId};
 use secp256k1::SecretKey;
-use tokio::sync::mpsc::UnboundedSender;
 use tokio::time;
 use tracing::info;
 
@@ -59,7 +58,6 @@ impl UpdateListener {
         dnsdisc: DnsDiscoveryHandle,
         network: NetworkHandle,
         key: SecretKey,
-        node_tx: UnboundedSender<Vec<NodeRecord>>,
         local_db: bool,
         provider_url: String,
     ) -> Self {
@@ -122,7 +120,7 @@ impl UpdateListener {
                                 info!("Skip counting p2p_failure for peer: {}", peer.address);
                                 return;
                             }
-                            p2p_failure_count = p2p_failure_count + 1;
+                            p2p_failure_count += 1;
                             if p2p_failure_count >= P2P_FAILURE_THRESHOLD as u64 {
                                 // ban this peer - TODO: we probably want Discv4Service::ban_until() semantics here, but that isn't exposed to us
                                 // for now - permaban
@@ -183,17 +181,11 @@ impl UpdateListener {
                     let mut city = String::default();
                     let mut isp = String::default();
 
-                    match Locator::get(&ip_addr, service).await {
-                        Ok(loc) => {
-                            country = loc.country;
-                            city = loc.city;
-                            isp = loc.isp;
-                        }
-                        Err(_) => {
-                            // leave `country` and `city` empty if not able to get them
-                        }
+                    if let Ok(loc) = Locator::get(&ip_addr, service).await {
+                        country = loc.country;
+                        city = loc.city;
+                        isp = loc.isp;
                     }
-
                     let capabilities: Vec<String> = their_hello
                         .capabilities
                         .iter()
@@ -275,7 +267,7 @@ impl UpdateListener {
                             info!("Skip counting p2p_failure for peer: {}", peer.address);
                             return;
                         }
-                        p2p_failure_count = p2p_failure_count + 1;
+                        p2p_failure_count += 1;
                         if p2p_failure_count >= P2P_FAILURE_THRESHOLD as u64 {
                             // ban this peer - TODO: we probably want Discv4Service::ban_until() semantics here, but that isn't exposed to us
                             // for now - permaban
@@ -334,15 +326,10 @@ impl UpdateListener {
                 let mut city = String::default();
                 let mut isp = String::default();
 
-                match Locator::get(&ip_addr, service).await {
-                    Ok(loc) => {
-                        country = loc.country;
-                        city = loc.city;
-                        isp = loc.isp;
-                    }
-                    Err(_) => {
-                        // leave `country` and `city` empty if not able to get them
-                    }
+                if let Ok(loc) = Locator::get(&ip_addr, service).await {
+                    country = loc.country;
+                    city = loc.city;
+                    isp = loc.isp;
                 }
 
                 let capabilities: Vec<String> = their_hello
@@ -421,7 +408,7 @@ impl UpdateListener {
                     tokio::spawn(async move {
                         // immediately disconnect the peer since we don't need any data from it
                         peer_handle.remove_peer(peer_id);
-                        let enode_url = NodeRecord::new(remote_addr.clone(), peer_id);
+                        let enode_url = NodeRecord::new(remote_addr, peer_id);
                         let capabilities = capabilities
                             .as_ref()
                             .capabilities()
@@ -440,15 +427,10 @@ impl UpdateListener {
                         let service = Service::IpApi;
                         let ip_addr = remote_addr.ip().to_string();
 
-                        match Locator::get(&ip_addr, service).await {
-                            Ok(loc) => {
-                                country = loc.country;
-                                city = loc.city;
-                                isp = loc.isp;
-                            }
-                            Err(_) => {
-                                // leave `country` and `city`empty if not able to get them
-                            }
+                        if let Ok(loc) = Locator::get(&ip_addr, service).await {
+                            country = loc.country;
+                            city = loc.city;
+                            isp = loc.isp;
                         }
                         // these peers inflate our numbers, same IP multiple generated ID
                         // TODO: ban them, but this isn't controlled by disc, and ban_ip semantics don't seem public to peers/network handles (?) - maybe peer_handle::reputation_change

@@ -2,9 +2,7 @@ use futures::join;
 use reth_discv4::Discv4;
 use reth_dns_discovery::DnsDiscoveryHandle;
 use reth_network::NetworkHandle;
-use reth_primitives::NodeRecord;
 use secp256k1::SecretKey;
-use tokio::sync::mpsc;
 use tracing::info;
 
 use crate::crawler::listener::UpdateListener;
@@ -22,9 +20,8 @@ impl CrawlerService {
         local_db: bool,
         provider_url: String,
     ) -> Self {
-        let (tx, rx) = mpsc::unbounded_channel::<Vec<NodeRecord>>();
         let updates =
-            UpdateListener::new(discv4, dnsdisc, network, key, tx, local_db, provider_url).await;
+            UpdateListener::new(discv4, dnsdisc, network, key, local_db, provider_url).await;
         Self { updates }
     }
 
