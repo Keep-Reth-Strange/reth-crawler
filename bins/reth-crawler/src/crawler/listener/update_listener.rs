@@ -592,4 +592,11 @@ impl<'a> UpdateListener<'a> {
         self.state.initialize().await?;
         Ok(())
     }
+
+    pub async fn start_state(&self) -> eyre::Result<()> {
+        tokio::spawn(async move {
+            self.state.await;
+        });
+        Ok(())
+    }
 }
