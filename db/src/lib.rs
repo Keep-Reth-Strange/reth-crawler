@@ -5,7 +5,7 @@ use std::sync::Arc;
 use tokio::{fs::OpenOptions, io::AsyncWriteExt};
 
 // Re-exports
-pub use db::{AwsPeerDB, InMemoryPeerDB, PeerDB, SqlPeerDB};
+pub use db::{AwsPeerDB, PeerDB, SqlPeerDB};
 pub use types::PeerData;
 
 /// Helper function to append a peer to file
