@@ -3,8 +3,6 @@ use async_trait::async_trait;
 use aws_config::meta::region::RegionProviderChain;
 use aws_sdk_dynamodb::types::AttributeValue;
 use aws_sdk_dynamodb::{config::Region, Client};
-use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
 use tokio_rusqlite::Connection;
 use tokio_stream::StreamExt;
 
@@ -362,7 +360,7 @@ impl PeerDB for SqlPeerDB {
     async fn all_active_peers(
         &self,
         last_seen: String,
-        page_size: Option<i32>,
+        _page_size: Option<i32>,
     ) -> Result<Vec<PeerData>, ScanTableError> {
         let peers = self
             .db
@@ -489,7 +487,7 @@ impl PeerDB for SqlPeerDB {
         Ok(Some(peers))
     }
 
-    async fn clients(&self, page_size: Option<i32>) -> Result<Vec<ClientData>, ScanTableError> {
+    async fn clients(&self, _page_size: Option<i32>) -> Result<Vec<ClientData>, ScanTableError> {
         let clients = self
             .db
             .call(move |conn| {
@@ -537,7 +535,7 @@ impl PeerDB for SqlPeerDB {
     async fn active_clients(
         &self,
         last_seen: String,
-        page_size: Option<i32>,
+        _page_size: Option<i32>,
     ) -> Result<Vec<ClientData>, ScanTableError> {
         let clients = self
             .db

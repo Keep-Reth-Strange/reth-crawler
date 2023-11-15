@@ -14,9 +14,11 @@ const MAX_LAST_SEEN: u64 = 5;
 pub fn rest_router() -> Router<AppState> {
     Router::new()
         .route("/nodes", get(get_nodes))
+        .route("/active-nodes", get(get_active_nodes))
         .route("/node/id/:id", get(get_node_by_id))
         .route("/node/ip/:ip", get(get_node_by_ip))
         .route("/clients", get(get_clients))
+        .route("/active-clients", get(get_active_clients))
 }
 
 async fn get_nodes(State(store): State<Arc<dyn PeerDB>>) -> Json<Vec<PeerData>> {
