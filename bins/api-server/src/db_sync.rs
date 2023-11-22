@@ -12,22 +12,20 @@ async fn db_sync(update_time: i64, first_sync: bool) -> Result<(), Box<dyn Error
 
     // take the time difference from last update (every 5 minutes)
     let now = Utc::now();
-    let time_difference =
-        now
-            // + 60 is to be sure to collect all update peers. So we collect all peers that have been added or edited in the last 6 minutes.
-            .checked_sub_signed(Duration::seconds(update_time + 60))
-            .unwrap()
-            .to_string();
+    let time_difference = now
+        // + 60 is to be sure to collect all update peers. So we collect all peers that have been added or edited in the last 6 minutes.
+        .checked_sub_signed(Duration::seconds(update_time + 60))
+        .unwrap()
+        .to_string();
 
     // scan table
-    let peers =
-        if first_sync {
-            dynamo_db.all_peers(PAGE_SIZE).await?
-        } else {
-            dynamo_db
-                .all_active_peers(time_difference, PAGE_SIZE)
-                .await?
-        };
+    let peers = if first_sync {
+        dynamo_db.all_peers(PAGE_SIZE).await?
+    } else {
+        dynamo_db
+            .all_active_peers(time_difference, PAGE_SIZE)
+            .await?
+    };
 
     // update sqliteDB from dynamoDB
     for peer in peers {

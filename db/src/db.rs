@@ -147,15 +147,15 @@ impl PeerDB for AwsPeerDB {
     }
 
     async fn node_by_id(&self, id: String) -> Result<Option<Vec<PeerData>>, QueryItemError> {
-        let results =
-            self.client
-                .query()
-                .table_name("eth-peer-data")
-                .key_condition_expression("#id = :id")
-                .expression_attribute_names("#id", "peer-id")
-                .expression_attribute_values(":id", AttributeValue::S(id))
-                .send()
-                .await?;
+        let results = self
+            .client
+            .query()
+            .table_name("eth-peer-data")
+            .key_condition_expression("#id = :id")
+            .expression_attribute_names("#id", "peer-id")
+            .expression_attribute_values(":id", AttributeValue::S(id))
+            .send()
+            .await?;
 
         if let Some(nodes) = results.items {
             let node = nodes.iter().map(|v| v.into()).collect();
@@ -199,15 +199,13 @@ impl PeerDB for AwsPeerDB {
             .await;
 
         match results {
-            Ok(peers) => {
-                peers
-                    .iter()
-                    .map(|peer| {
-                        let client_version = Into::<PeerData>::into(peer).client_version;
-                        Ok(ClientData { client_version })
-                    })
-                    .collect()
-            }
+            Ok(peers) => peers
+                .iter()
+                .map(|peer| {
+                    let client_version = Into::<PeerData>::into(peer).client_version;
+                    Ok(ClientData { client_version })
+                })
+                .collect(),
             Err(err) => Err(err.into()),
         }
     }
@@ -235,15 +233,13 @@ impl PeerDB for AwsPeerDB {
             .await;
 
         match results {
-            Ok(peers) => {
-                peers
-                    .iter()
-                    .map(|peer| {
-                        let client_version = Into::<PeerData>::into(peer).client_version;
-                        Ok(ClientData { client_version })
-                    })
-                    .collect()
-            }
+            Ok(peers) => peers
+                .iter()
+                .map(|peer| {
+                    let client_version = Into::<PeerData>::into(peer).client_version;
+                    Ok(ClientData { client_version })
+                })
+                .collect(),
             Err(err) => Err(err.into()),
         }
     }
