@@ -26,6 +26,7 @@ lru.workspace = true
 clap.workspace = true
 ethers.workspace = true
 tokio.workspace = true
+tokio-stream.workspace = true
 tracing-subscriber.workspace = true
 console-subscriber.workspace = true
 tracing.workspace = true

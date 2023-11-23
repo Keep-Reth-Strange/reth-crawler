@@ -1,15 +1,14 @@
+use crate::crawler::{BlockHashNum, CrawlerService};
+use ethers::providers::{Provider, Ws};
 use once_cell::sync::Lazy;
 use reth_discv4::{Discv4, Discv4ConfigBuilder, DEFAULT_DISCOVERY_ADDRESS};
 use reth_dns_discovery::{DnsDiscoveryConfig, DnsDiscoveryService, DnsResolver};
-
 use reth_network::config::rng_secret_key;
 use reth_network::{NetworkConfig, NetworkManager, PeersConfig};
 use reth_primitives::{mainnet_nodes, NodeRecord};
 use reth_provider::test_utils::NoopProvider;
 use std::sync::Arc;
 use std::time::Duration;
-
-use crate::crawler::CrawlerService;
 
 pub static MAINNET_BOOT_NODES: Lazy<Vec<NodeRecord>> = Lazy::new(mainnet_nodes);
 
@@ -63,6 +62,10 @@ impl CrawlerBuilder {
     pub async fn build(self) -> CrawlerService {
         // Ensure the rpc url is set
         let provider_url = self.eth_rpc_url.expect("eth rpc url must be provided");
+        // Create the connection with the provider
+        let provider = Provider::<Ws>::connect(provider_url)
+            .await
+            .expect("provider must be set up correctly");
 
         // Setup configs related to this 'node' by creating a new random
         let key = rng_secret_key();
@@ -99,13 +102,17 @@ impl CrawlerBuilder {
         dns_disc_service.spawn();
         tokio::spawn(network);
 
+        let (state, state_handle) = BlockHashNum::new();
+        tokio::spawn(state);
+
         CrawlerService::new(
             discv4,
             dnsdisc,
             net_handle,
+            state_handle,
             key,
             self.local_db,
-            provider_url,
+            provider,
         )
         .await
     }
