@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use aws_config::meta::region::RegionProviderChain;
 use aws_sdk_dynamodb::types::AttributeValue;
 use aws_sdk_dynamodb::{config::Region, Client};
-use tokio_rusqlite::Connection;
+use tokio_rusqlite::{params, Connection};
 use tokio_stream::StreamExt;
 
 #[async_trait]
@@ -272,10 +272,12 @@ impl SqlPeerDB {
                 capabilities TEXT,
                 eth_version INTEGER,
                 synced BOOLEAN,
-                isp TEXT
+                isp TEXT,
+                archive BOOLEAN
             );",
                     [],
                 )
+                .map_err(|err| err.into())
             })
             .await
             .unwrap();
@@ -290,7 +292,7 @@ impl PeerDB for SqlPeerDB {
             .call(move |conn| {
                 conn.execute(
                     "INSERT OR REPLACE INTO eth_peer_data (id, ip, client_version, enode_url, port, chain, genesis_hash, best_block, total_difficulty, country, city, last_seen, capabilities, eth_version, synced, isp) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
-                    (
+                    params![
                         &peer_data.id,
                         &peer_data.address,
                         &peer_data.client_version,
@@ -307,8 +309,9 @@ impl PeerDB for SqlPeerDB {
                         &peer_data.eth_version,
                         &peer_data.synced,
                         &peer_data.isp,
-                    ),
-                )
+                        &peer_data.archive,
+                    ],
+                ).map_err(|err| err.into())
             })
             .await
             .map_err(AddItemError::SqlAddItemError)?;
@@ -343,6 +346,7 @@ impl PeerDB for SqlPeerDB {
                         eth_version: row.get(13)?,
                         synced: row.get(14)?,
                         isp: row.get(15)?,
+                        archive: row.get(15)?,
                     })
                 })?;
                 let mut peers = vec![];
@@ -389,6 +393,7 @@ impl PeerDB for SqlPeerDB {
                         eth_version: row.get(13)?,
                         synced: row.get(14)?,
                         isp: row.get(15)?,
+                        archive: row.get(15)?,
                     })
                 })?;
                 let mut peers = vec![];
@@ -431,6 +436,7 @@ impl PeerDB for SqlPeerDB {
                         eth_version: row.get(13)?,
                         synced: row.get(14)?,
                         isp: row.get(15)?,
+                        archive: row.get(15)?,
                     })
                 })?;
                 let mut peers = vec![];
@@ -473,6 +479,7 @@ impl PeerDB for SqlPeerDB {
                         eth_version: row.get(13)?,
                         synced: row.get(14)?,
                         isp: row.get(15)?,
+                        archive: row.get(15)?,
                     })
                 })?;
                 let mut peers = vec![];
@@ -515,6 +522,7 @@ impl PeerDB for SqlPeerDB {
                         eth_version: row.get(13)?,
                         synced: row.get(14)?,
                         isp: row.get(15)?,
+                        archive: row.get(15)?,
                     })
                 })?;
                 let mut clients = vec![];
@@ -564,6 +572,7 @@ impl PeerDB for SqlPeerDB {
                         eth_version: row.get(13)?,
                         synced: row.get(14)?,
                         isp: row.get(15)?,
+                        archive: row.get(15)?,
                     })
                 })?;
                 let mut clients = vec![];

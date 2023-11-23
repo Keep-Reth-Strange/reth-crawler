@@ -26,6 +26,8 @@ pub struct PeerData {
     pub city: String,
     pub synced: Option<bool>,
     pub isp: String,
+    /// True if peer is an archive node, false if it is not. `None` if we are not able to get that info.
+    pub archive: Option<bool>,
 }
 
 impl PeerData {
@@ -47,6 +49,7 @@ impl PeerData {
         eth_version: u8,
         synced: Option<bool>,
         isp: String,
+        archive: Option<bool>,
     ) -> Self {
         Self {
             enode_url,
@@ -65,6 +68,7 @@ impl PeerData {
             genesis_block_hash,
             synced,
             isp,
+            archive,
         }
     }
 }
@@ -88,6 +92,7 @@ impl From<&HashMap<String, AttributeValue>> for PeerData {
             as_u8(value.get("eth_version"), 0),
             as_option_bool(value.get("synced"), None),
             as_string(value.get("isp"), &"".to_string()),
+            as_option_bool(value.get("archive"), None),
         );
 
         peer_data
