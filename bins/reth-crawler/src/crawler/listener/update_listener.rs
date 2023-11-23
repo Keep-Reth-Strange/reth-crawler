@@ -1,4 +1,4 @@
-use crate::crawler::block_hash_num::BlockHashNumHandle;
+use crate::crawler::BlockHashNumHandle;
 use crate::p2p::{handshake_eth, handshake_p2p};
 use chrono::Utc;
 use ethers::providers::{Middleware, Provider, Ws};
