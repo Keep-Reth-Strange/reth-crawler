@@ -1,11 +1,12 @@
+use super::block_hash_num::BlockHashNumHandle;
+use crate::crawler::listener::UpdateListener;
+use ethers::providers::{Provider, Ws};
 use futures::join;
 use reth_discv4::Discv4;
 use reth_dns_discovery::DnsDiscoveryHandle;
 use reth_network::NetworkHandle;
 use secp256k1::SecretKey;
 use tracing::info;
-
-use crate::crawler::listener::UpdateListener;
 
 pub struct CrawlerService {
     updates: UpdateListener,
@@ -16,26 +17,31 @@ impl CrawlerService {
         discv4: Discv4,
         dnsdisc: DnsDiscoveryHandle,
         network: NetworkHandle,
+        state_handle: BlockHashNumHandle,
         key: SecretKey,
         local_db: bool,
-        provider_url: String,
+        provider: Provider<Ws>,
     ) -> Self {
-        let updates =
-            UpdateListener::new(discv4, dnsdisc, network, key, local_db, provider_url).await;
+        let updates = UpdateListener::new(
+            discv4,
+            dnsdisc,
+            network,
+            state_handle,
+            key,
+            local_db,
+            provider,
+        )
+        .await;
         Self { updates }
     }
 
     pub async fn run(self) -> (eyre::Result<()>, eyre::Result<()>, (), eyre::Result<()>) {
-        // first initialize the state
-        info!("start initializing the state...");
-        let _ = self.updates.initialize_state().await;
-        // then start crawling
-        info!("start crawling...");
+        info!("start crawling...wait for the state to be initialized (30 seconds)...");
         join!(
             self.updates.start_discv4(),
             self.updates.start_dnsdisc(),
             self.updates.start_network(),
-            self.updates.start_state(),
+            self.updates.block_subscription_manager(),
         )
     }
 }
