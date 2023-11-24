@@ -4,6 +4,7 @@ use std::error::Error;
 
 const PAGE_SIZE: Option<i32> = None;
 
+/// Updates the SQLite db used for APIs requests from the AWS db used for the crawler.
 async fn db_sync(update_time: i64, first_sync: bool) -> Result<(), Box<dyn Error>> {
     // dynamoDB setup
     let dynamo_db = AwsPeerDB::new().await;
@@ -35,7 +36,8 @@ async fn db_sync(update_time: i64, first_sync: bool) -> Result<(), Box<dyn Error
     Ok(())
 }
 
-pub async fn db_sync_handler(update_time: i64) -> Result<(), Box<dyn Error>> {
+/// Handler function that keeps updating the SQLite db used for serving APIs requests.
+pub(crate) async fn db_sync_handler(update_time: i64) -> Result<(), Box<dyn Error>> {
     // we can unwrap because `update_time` is fixed to +5 minutes.
     let mut interval = tokio::time::interval(Duration::seconds(update_time).to_std().unwrap());
     let mut first_sync = true;

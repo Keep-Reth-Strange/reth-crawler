@@ -11,7 +11,8 @@ use std::sync::Arc;
 /// The max `last_seen` a node can have and still be considered active (in DAYS).
 const MAX_LAST_SEEN: u64 = 5;
 
-pub fn rest_router() -> Router<AppState> {
+/// Router for all APIs.
+pub(crate) fn rest_router() -> Router<AppState> {
     Router::new()
         .route("/nodes", get(get_nodes))
         .route("/active-nodes", get(get_active_nodes))
