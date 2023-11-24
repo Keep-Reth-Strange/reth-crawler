@@ -10,11 +10,14 @@ use reth_provider::test_utils::NoopProvider;
 use std::sync::Arc;
 use std::time::Duration;
 
-pub static MAINNET_BOOT_NODES: Lazy<Vec<NodeRecord>> = Lazy::new(mainnet_nodes);
+/// Ethereum mainnet boot nodes.
+///
+/// These are hard coded Ethereum mainnet nodes that are helpful when a node runs for the first time and needs to find some other nodes.
+static MAINNET_BOOT_NODES: Lazy<Vec<NodeRecord>> = Lazy::new(mainnet_nodes);
 
 /// Builder for a [`CrawlerService`]
 #[derive(Clone, Debug)]
-pub struct CrawlerBuilder {
+pub(crate) struct CrawlerBuilder {
     /// Whether or not to use a local db
     local_db: bool,
     /// Eth RPC url
@@ -41,25 +44,25 @@ impl Default for CrawlerBuilder {
 
 impl CrawlerBuilder {
     /// Enable the local db
-    pub fn with_local_db(mut self) -> Self {
+    pub(crate) fn with_local_db(mut self) -> Self {
         self.local_db = true;
         self
     }
 
     /// Disable the local db
-    pub fn without_local_db(mut self) -> Self {
+    pub(crate) fn without_local_db(mut self) -> Self {
         self.local_db = false;
         self
     }
 
     /// Set the eth rpc url
-    pub fn with_eth_rpc_url(mut self, eth_rpc_url: String) -> Self {
+    pub(crate) fn with_eth_rpc_url(mut self, eth_rpc_url: String) -> Self {
         self.eth_rpc_url = Some(eth_rpc_url);
         self
     }
 
     /// Build the [`CrawlerService`]
-    pub async fn build(self) -> CrawlerService {
+    pub(crate) async fn build(self) -> CrawlerService {
         // Ensure the rpc url is set
         let provider_url = self.eth_rpc_url.expect("eth rpc url must be provided");
         // Create the connection with the provider
