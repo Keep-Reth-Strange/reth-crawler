@@ -245,6 +245,7 @@ async fn is_archive(ip_addr: &str) -> eyre::Result<bool> {
     println!("ENTER IS_ARCHIVE FN");
     let ip_addr = format!("{}:8545", ip_addr);
     let provider = Provider::try_from(ip_addr)?;
+    println!("PROVIDER CONNECTED");
     match provider
         .get_balance(ACCOUNT, Some(TEN_MILION_BLOCK.into()))
         .await
