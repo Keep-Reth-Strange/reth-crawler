@@ -1,7 +1,7 @@
 use crate::crawler::BlockHashNumHandle;
 use crate::p2p::{handshake_eth, handshake_p2p};
 use chrono::Utc;
-use ethers::providers::{Middleware, Provider, Ws};
+use ethers::providers::{Middleware, Provider, RpcError, Ws};
 use ethers::types::H256;
 use futures::StreamExt;
 use ipgeolocate::{Locator, Service};
@@ -176,6 +176,10 @@ impl UpdateListener {
                         let tcp_port = remote_addr.port();
                         let client_version = client_version.to_string();
                         let eth_version = u8::from(version);
+                        let archive = match is_archive(&address).await {
+                            Ok(archive) => Some(archive),
+                            Err(_) => None,
+                        };
 
                         let peer_data = PeerData::new(
                             enode_url,
@@ -194,6 +198,7 @@ impl UpdateListener {
                             eth_version,
                             synced,
                             isp,
+                            archive,
                         );
                         save_peer(peer_data, db).await;
                     });
@@ -224,6 +229,45 @@ impl UpdateListener {
         }
 
         Ok(())
+    }
+}
+
+/// Hard coded data for the 10Mth block.
+const TEN_MILION_BLOCK: u64 = 10_000_000;
+/// Random account that has a balance in the 10Mth block.
+const ACCOUNT: &str = "0xf93501385BdE9305C6a36E13D0Ee499B01574338";
+
+/// Trying to guess if a peer is running an archive or full node.
+///
+/// Note: this data can be sybilled.
+async fn is_archive(ip_addr: &str) -> eyre::Result<bool> {
+    // try connecting to the peer
+    println!("ENTER IS_ARCHIVE FN");
+    let ip_addr = format!("{}:8545", ip_addr);
+    let provider = Provider::try_from(ip_addr)?;
+    match provider
+        .get_balance(ACCOUNT, Some(TEN_MILION_BLOCK.into()))
+        .await
+    {
+        Ok(_account_balance) => {
+            println!("EXITING IS_ARCHIVE FN");
+            Ok(true)
+        }
+        Err(err) => match err.as_error_response() {
+            Some(err) => {
+                if err.message.contains("Missing trie node") {
+                    println!("EXITING IS_ARCHIVE FN");
+                    Ok(false)
+                } else {
+                    println!("EXITING IS_ARCHIVE FN");
+                    Err(eyre::eyre!("not able to get RPC response"))
+                }
+            }
+            None => {
+                println!("EXITING IS_ARCHIVE FN");
+                Err(eyre::eyre!("not able to get RPC response"))
+            }
+        },
     }
 }
 
@@ -374,6 +418,10 @@ async fn handshake_and_save_peer(
     let tcp_port = peer.tcp_port;
     let client_version = their_hello.client_version.clone();
     let eth_version = their_status.version;
+    let archive = match is_archive(&address).await {
+        Ok(archive) => Some(archive),
+        Err(_) => None,
+    };
 
     info!(
         "Successfully connected to a peer at {}:{} ({}) using eth-wire version eth/{:#?}",
@@ -398,6 +446,7 @@ async fn handshake_and_save_peer(
         eth_version,
         synced,
         isp,
+        archive,
     );
     save_peer(peer_data, db).await;
 }

@@ -70,6 +70,11 @@ impl PeerDB for AwsPeerDB {
             AttributeValue::Null(true)
         };
         let isp = AttributeValue::S(peer_data.isp);
+        let archive = if let Some(archive) = peer_data.archive {
+            AttributeValue::Bool(archive)
+        } else {
+            AttributeValue::Null(true)
+        };
 
         match self
             .client
@@ -92,6 +97,7 @@ impl PeerDB for AwsPeerDB {
             .item("total_difficulty", total_difficulty)
             .item("synced", synced)
             .item("isp", isp)
+            .item("archive", archive)
             .send()
             .await
         {
@@ -291,7 +297,7 @@ impl PeerDB for SqlPeerDB {
         self.db
             .call(move |conn| {
                 conn.execute(
-                    "INSERT OR REPLACE INTO eth_peer_data (id, ip, client_version, enode_url, port, chain, genesis_hash, best_block, total_difficulty, country, city, last_seen, capabilities, eth_version, synced, isp) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
+                    "INSERT OR REPLACE INTO eth_peer_data (id, ip, client_version, enode_url, port, chain, genesis_hash, best_block, total_difficulty, country, city, last_seen, capabilities, eth_version, synced, isp, archive) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
                     params![
                         &peer_data.id,
                         &peer_data.address,
@@ -346,7 +352,7 @@ impl PeerDB for SqlPeerDB {
                         eth_version: row.get(13)?,
                         synced: row.get(14)?,
                         isp: row.get(15)?,
-                        archive: row.get(15)?,
+                        archive: row.get(16)?,
                     })
                 })?;
                 let mut peers = vec![];
@@ -393,7 +399,7 @@ impl PeerDB for SqlPeerDB {
                         eth_version: row.get(13)?,
                         synced: row.get(14)?,
                         isp: row.get(15)?,
-                        archive: row.get(15)?,
+                        archive: row.get(16)?,
                     })
                 })?;
                 let mut peers = vec![];
@@ -436,7 +442,7 @@ impl PeerDB for SqlPeerDB {
                         eth_version: row.get(13)?,
                         synced: row.get(14)?,
                         isp: row.get(15)?,
-                        archive: row.get(15)?,
+                        archive: row.get(16)?,
                     })
                 })?;
                 let mut peers = vec![];
@@ -479,7 +485,7 @@ impl PeerDB for SqlPeerDB {
                         eth_version: row.get(13)?,
                         synced: row.get(14)?,
                         isp: row.get(15)?,
-                        archive: row.get(15)?,
+                        archive: row.get(16)?,
                     })
                 })?;
                 let mut peers = vec![];
@@ -522,7 +528,7 @@ impl PeerDB for SqlPeerDB {
                         eth_version: row.get(13)?,
                         synced: row.get(14)?,
                         isp: row.get(15)?,
-                        archive: row.get(15)?,
+                        archive: row.get(16)?,
                     })
                 })?;
                 let mut clients = vec![];
@@ -572,7 +578,7 @@ impl PeerDB for SqlPeerDB {
                         eth_version: row.get(13)?,
                         synced: row.get(14)?,
                         isp: row.get(15)?,
-                        archive: row.get(15)?,
+                        archive: row.get(16)?,
                     })
                 })?;
                 let mut clients = vec![];
