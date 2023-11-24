@@ -1,3 +1,14 @@
+#![warn(
+    missing_debug_implementations,
+    missing_docs,
+    unreachable_pub,
+    rustdoc::all
+)]
+#![deny(unused_must_use, rust_2018_idioms)]
+#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
+
+//! It serves RESTful APIs that can be used to extract data from the crawler database.
+
 mod db_sync;
 mod peerdb;
 

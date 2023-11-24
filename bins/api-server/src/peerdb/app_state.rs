@@ -1,21 +1,16 @@
+use axum::extract::FromRef;
+use reth_crawler_db::{db::SqlPeerDB, PeerDB};
 use std::sync::Arc;
 
-use axum::extract::FromRef;
-use reth_crawler_db::{db::SqlPeerDB, AwsPeerDB, PeerDB};
-
+/// Stores the database.
 #[derive(Clone, FromRef)]
-pub struct AppState {
+pub(crate) struct AppState {
     store: Arc<dyn PeerDB>,
 }
 
 impl AppState {
-    pub async fn new_aws() -> Self {
-        Self {
-            store: Arc::new(AwsPeerDB::new().await),
-        }
-    }
-
-    pub async fn new_sql() -> Self {
+    /// Create an `AppState` with a SQLite database.
+    pub(crate) async fn new_sql() -> Self {
         Self {
             store: Arc::new(SqlPeerDB::new().await),
         }
