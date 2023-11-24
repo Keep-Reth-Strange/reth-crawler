@@ -7,7 +7,7 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-//! Api server generates RESTful APIs that can be used to extract data from the crawler database.
+//! It serves RESTful APIs that can be used to extract data from the crawler database.
 
 mod db_sync;
 mod peerdb;
