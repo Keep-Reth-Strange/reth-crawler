@@ -11,7 +11,7 @@ type AuthedP2PStream = P2PStream<ECIESStream<TcpStream>>;
 type AuthedEthStream = EthStream<P2PStream<ECIESStream<TcpStream>>>;
 
 // Perform a P2P handshake with a peer
-pub async fn handshake_p2p(
+pub(crate) async fn handshake_p2p(
     peer: NodeRecord,
     key: SecretKey,
 ) -> eyre::Result<(AuthedP2PStream, HelloMessage)> {
@@ -27,7 +27,9 @@ pub async fn handshake_p2p(
 }
 
 // Perform a ETH Wire handshake with a peer
-pub async fn handshake_eth(p2p_stream: AuthedP2PStream) -> eyre::Result<(AuthedEthStream, Status)> {
+pub(crate) async fn handshake_eth(
+    p2p_stream: AuthedP2PStream,
+) -> eyre::Result<(AuthedEthStream, Status)> {
     let fork_filter = MAINNET.fork_filter(Head {
         timestamp: MAINNET.fork(Hardfork::Shanghai).as_timestamp().unwrap(),
         ..Default::default()
@@ -49,7 +51,7 @@ pub async fn handshake_eth(p2p_stream: AuthedP2PStream) -> eyre::Result<(AuthedE
 
 // Snoop by greedily capturing all broadcasts that the peer emits
 // note: this node cannot handle request so will be disconnected by peer when challenged
-pub async fn _snoop(peer: NodeRecord, mut eth_stream: AuthedEthStream) {
+pub(crate) async fn _snoop(peer: NodeRecord, mut eth_stream: AuthedEthStream) {
     while let Some(Ok(update)) = eth_stream.next().await {
         match update {
             EthMessage::NewPooledTransactionHashes66(txs) => {

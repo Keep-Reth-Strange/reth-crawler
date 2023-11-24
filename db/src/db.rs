@@ -1,3 +1,5 @@
+//! The `PeerDB` trait works as an abstraction over the database.
+
 use crate::types::{AddItemError, ClientData, PeerData, QueryItemError, ScanTableError};
 use async_trait::async_trait;
 use aws_config::meta::region::RegionProviderChain;
@@ -6,18 +8,30 @@ use aws_sdk_dynamodb::{config::Region, Client};
 use tokio_rusqlite::Connection;
 use tokio_stream::StreamExt;
 
+/// The abstraction trait over the database.
 #[async_trait]
 pub trait PeerDB: Send + Sync {
+    /// Add a peer into the database.
     async fn add_peer(&self, peer_data: PeerData) -> Result<(), AddItemError>;
+    /// Returns all peers in the database.
     async fn all_peers(&self, page_size: Option<i32>) -> Result<Vec<PeerData>, ScanTableError>;
+    /// Returns all active peers in the database.
+    ///
+    /// An active peer is a peer with `last_seen` greater than the input you use here.
     async fn all_active_peers(
         &self,
         last_seen: String,
         page_size: Option<i32>,
     ) -> Result<Vec<PeerData>, ScanTableError>;
+    /// Get a node by its id.
     async fn node_by_id(&self, id: String) -> Result<Option<Vec<PeerData>>, QueryItemError>;
+    /// Get a node by its ip address.
     async fn node_by_ip(&self, ip: String) -> Result<Option<Vec<PeerData>>, QueryItemError>;
+    /// Returns all clients in the database.
     async fn clients(&self, page_size: Option<i32>) -> Result<Vec<ClientData>, ScanTableError>;
+    /// Returns all clients in the database.
+    ///
+    /// An active client is a client whose peer has a `last_seen` greater than the input you use here.
     async fn active_clients(
         &self,
         last_seen: String,
@@ -25,12 +39,14 @@ pub trait PeerDB: Send + Sync {
     ) -> Result<Vec<ClientData>, ScanTableError>;
 }
 
-#[derive(Clone)]
+/// Aws dynamo database.
+#[derive(Clone, Debug)]
 pub struct AwsPeerDB {
     client: Client,
 }
 
 impl AwsPeerDB {
+    /// Create a new AWS dynamo db or connect to an already existing one.
     pub async fn new() -> Self {
         let region_provider =
             RegionProviderChain::default_provider().or_else(Region::new("us-west-2"));
@@ -245,11 +261,14 @@ impl PeerDB for AwsPeerDB {
     }
 }
 
+/// SQLite db.
+#[derive(Debug)]
 pub struct SqlPeerDB {
     db: Connection,
 }
 
 impl SqlPeerDB {
+    /// Create a new SQLite db or connect to an already existing one.
     pub async fn new() -> Self {
         let db = Connection::open("peers_data.db").await.unwrap();
         // create `eth_peer_data` table if not exists

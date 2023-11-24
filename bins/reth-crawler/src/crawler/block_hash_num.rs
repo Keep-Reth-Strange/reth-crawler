@@ -17,20 +17,22 @@ const SYNCED_THRESHOLD: u64 = 100;
 
 /// This holds the mapping between block hash and block number of the latest `SYNCED_THRESHOLD` blocks.
 #[derive(Debug)]
-pub struct BlockHashNum {
+pub(crate) struct BlockHashNum {
     /// Inner chache for mapping block hashes to block numbers.
     blocks_hash_to_number: LruCache<H256, U64>,
     /// Receiver half of the channel for block requests
     command_rx: UnboundedReceiverStream<HashRequest>,
     /// Copy of the sender half of the channel so handles can be created on demand.
     service_tx: UnboundedSender<HashRequest>,
+    /// Receiver half of the channel for block updates.
     block_subscription_rx: UnboundedReceiverStream<BlockUpdate>,
+    /// Copy of the sender half of the channel so handles can be created on demand.
     block_subscription_tx: UnboundedSender<BlockUpdate>,
 }
 
 impl BlockHashNum {
     /// Create a new service to resolve and cache block hashes / numbers mapping.
-    pub fn new() -> (Self, BlockHashNumHandle) {
+    pub(crate) fn new() -> (Self, BlockHashNumHandle) {
         let (service_tx, command_rx) = mpsc::unbounded_channel();
         let (block_subscription_tx, block_subscription_rx) = mpsc::unbounded_channel();
         let service = Self {
@@ -80,8 +82,9 @@ impl Future for BlockHashNum {
     }
 }
 
+/// Hash requets to be sent in the channel.
 #[derive(Debug)]
-pub struct HashRequest {
+struct HashRequest {
     /// The requested hash.
     hash: H256,
     /// The channel for returning the response.
@@ -90,9 +93,10 @@ pub struct HashRequest {
 
 /// A clone-able handle that sends requests to the block hash to num service
 #[derive(Clone, Debug)]
-pub struct BlockHashNumHandle {
-    /// Sender half of the message channel.
+pub(crate) struct BlockHashNumHandle {
+    /// Sender half of the message channel for hash requests.
     to_service_hash_request: mpsc::UnboundedSender<HashRequest>,
+    /// Sender half of the message channel for block updates.
     to_service_block_update: mpsc::UnboundedSender<BlockUpdate>,
 }
 
@@ -109,7 +113,7 @@ impl BlockHashNumHandle {
     }
 
     /// Send a `HashRequest` in the channel.
-    pub async fn is_block_hash_present(&self, hash: H256) -> eyre::Result<bool> {
+    pub(crate) async fn is_block_hash_present(&self, hash: H256) -> eyre::Result<bool> {
         let (tx, rx) = oneshot::channel();
         let hash_request = HashRequest { hash, response: tx };
         self.to_service_hash_request.send(hash_request)?;
@@ -117,7 +121,7 @@ impl BlockHashNumHandle {
     }
 
     /// Send a `BlockUpdate` in the channel.
-    pub async fn new_block(&self, hash: H256, number: U64) -> eyre::Result<()> {
+    pub(crate) async fn new_block(&self, hash: H256, number: U64) -> eyre::Result<()> {
         let (tx, rx) = oneshot::channel();
         let block_update = BlockUpdate {
             hash,

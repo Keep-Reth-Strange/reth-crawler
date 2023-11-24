@@ -20,24 +20,38 @@ use tokio::net::TcpStream;
 use tokio::time;
 use tracing::info;
 
+/// How many p2p failures we accept from a peer before banning it.
 const P2P_FAILURE_THRESHOLD: u8 = 5;
 /// Stop the async tasks for this duration in seconds so that the state could be properly initialized!
 const SLEEP_TIME: u64 = 30;
 
-pub struct UpdateListener {
+/// Listener that starts all services:
+/// - discovery
+/// - dns discovery
+/// - network
+/// - state
+pub(crate) struct UpdateListener {
+    /// Discovery protocol handle.
     discv4: Discv4,
+    /// Dns discovery protocol handle.
     dnsdisc: DnsDiscoveryHandle,
+    /// Network handle for incoming requests.
     network: NetworkHandle,
+    /// State handle for `BlockUpdate` and `HashRequest` requests.
     state_handle: BlockHashNumHandle,
+    /// Private key of the node of the crawler.
     key: SecretKey,
+    /// Database.
     db: Arc<dyn PeerDB>,
+    /// Mapping between peer and number of p2p failures.
     p2p_failures: Arc<RwLock<HashMap<PeerId, u64>>>,
     /// Inner provider to use for block requests.
     provider: Provider<Ws>,
 }
 
 impl UpdateListener {
-    pub async fn new(
+    /// Create a new `UpdateListener`.
+    pub(crate) async fn new(
         discv4: Discv4,
         dnsdisc: DnsDiscoveryHandle,
         network: NetworkHandle,
@@ -72,7 +86,8 @@ impl UpdateListener {
         }
     }
 
-    pub async fn start_discv4(&self) -> eyre::Result<()> {
+    /// Start discovery v4 protocol.
+    pub(crate) async fn start_discv4(&self) -> eyre::Result<()> {
         time::sleep(Duration::from_secs(SLEEP_TIME)).await;
         let mut discv4_stream = self.discv4.update_stream().await?;
         let key = self.key;
@@ -101,7 +116,8 @@ impl UpdateListener {
         Ok(())
     }
 
-    pub async fn start_dnsdisc(&self) -> eyre::Result<()> {
+    /// Start dns discovery protocol.
+    pub(crate) async fn start_dnsdisc(&self) -> eyre::Result<()> {
         time::sleep(Duration::from_secs(SLEEP_TIME)).await;
         let mut dnsdisc_update_stream = self.dnsdisc.node_record_stream().await?;
         let key = self.key;
@@ -122,7 +138,8 @@ impl UpdateListener {
         Ok(())
     }
 
-    pub async fn start_network(&self) {
+    /// Start network for handling incoming connections.
+    pub(crate) async fn start_network(&self) {
         time::sleep(Duration::from_secs(SLEEP_TIME)).await;
         let mut net_events = self.network.event_listener();
         info!("network is starting...");
@@ -212,7 +229,8 @@ impl UpdateListener {
         }
     }
 
-    pub async fn block_subscription_manager(&self) -> eyre::Result<()> {
+    /// Start state to update it (LRU) with new blocks.
+    pub(crate) async fn block_subscription_manager(&self) -> eyre::Result<()> {
         let mut block_subscription = self.provider.subscribe_blocks().await?;
 
         while let Some(block) = block_subscription.next().await {
@@ -238,6 +256,7 @@ async fn is_synced(state_handle: BlockHashNumHandle, hash: H256) -> Option<bool>
     synced
 }
 
+/// Gelocate a peer.
 async fn geolocate(ip_addr: &str) -> (String, String, String) {
     let service = Service::IpApi;
     let mut country = String::default();
@@ -251,6 +270,7 @@ async fn geolocate(ip_addr: &str) -> (String, String, String) {
     (country, city, isp)
 }
 
+/// Helper function for p2p handshake.
 async fn handshake_p2p_handle(
     captured_discv4: &Discv4,
     p2p_failures: Arc<RwLock<HashMap<PeerId, u64>>>,
@@ -301,6 +321,7 @@ async fn handshake_p2p_handle(
     Some((p2p_stream, their_hello))
 }
 
+/// Helper function for eth status handshake.
 async fn handshake_eth_handle(
     captured_discv4: &Discv4,
     p2p_stream: P2PStream<ECIESStream<TcpStream>>,
@@ -318,6 +339,7 @@ async fn handshake_eth_handle(
     Some(their_status)
 }
 
+/// Helper function for handling handshakes and saving to the database.
 async fn handshake_and_save_peer(
     captured_discv4: Discv4,
     p2p_failures: Arc<RwLock<HashMap<PeerId, u64>>>,
