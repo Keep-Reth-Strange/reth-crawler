@@ -191,7 +191,14 @@ impl UpdateListener {
                         let enode_url = enode_url.to_string();
                         let id = peer_id.to_string();
                         let tcp_port = remote_addr.port();
-                        let client_version = client_version.to_string();
+                        let (
+                            client_name,
+                            client_version,
+                            client_build,
+                            client_arch,
+                            os,
+                            client_language,
+                        ) = split_version(&client_version);
                         let eth_version = u8::from(version);
 
                         let peer_data = PeerData::new(
@@ -199,7 +206,12 @@ impl UpdateListener {
                             id,
                             address,
                             tcp_port,
+                            client_name,
                             client_version,
+                            client_build,
+                            client_arch,
+                            os,
+                            client_language,
                             capabilities,
                             last_seen,
                             country,
@@ -394,7 +406,8 @@ async fn handshake_and_save_peer(
     let enode_url = peer.to_string();
     let id = peer.id.to_string();
     let tcp_port = peer.tcp_port;
-    let client_version = their_hello.client_version.clone();
+    let (client_name, client_version, client_build, client_arch, os, client_language) =
+        split_version(&their_hello.client_version);
     let eth_version = their_status.version;
 
     info!(
@@ -408,7 +421,12 @@ async fn handshake_and_save_peer(
         id,
         address,
         tcp_port,
+        client_name,
         client_version,
+        client_build,
+        client_arch,
+        os,
+        client_language,
         capabilities,
         last_seen,
         country,
@@ -422,4 +440,55 @@ async fn handshake_and_save_peer(
         isp,
     );
     save_peer(peer_data, db).await;
+}
+
+/// Separate the long `client_version` field from the hello handshake message into:
+/// - `client_name`
+/// - `client_version`
+/// - `client_build`
+/// - `client_arch`
+/// - `os`
+/// - `client_language`
+fn split_version(input: &str) -> (String, String, String, String, String, String) {
+    let split: Vec<&str> = input.split('/').collect();
+    if split.len() == 4 {
+        let client_name = split[0].to_string();
+        let (client_version, client_build) = split_at_dash_or_plus(split[1]);
+        let (os, client_arch) = split_at_dash_or_plus(split[2]);
+        let client_language = split[3].to_string();
+        (
+            client_name,
+            client_version,
+            client_build,
+            client_arch,
+            os,
+            client_language,
+        )
+    } else {
+        (
+            input.to_string(),
+            "".to_string(),
+            "".to_string(),
+            "".to_string(),
+            "".to_string(),
+            "".to_string(),
+        )
+    }
+}
+
+/// Helper function to separate a string based on the first `-`.
+///
+/// If it doesn't find a `-` it tries with a `+` (thanks Nethermind...).
+fn split_at_dash_or_plus(input: &str) -> (String, String) {
+    let split: Option<(&str, &str)> = input.split_once('-');
+    if let Some((before, after)) = split {
+        (before.to_string(), after.to_string())
+    } else {
+        let split: Option<(&str, &str)> = input.split_once('+');
+        if let Some((before, after)) = split {
+            (before.to_string(), after.to_string())
+        } else {
+            (input.to_string(), "".to_string())
+        }
+    }
 }
