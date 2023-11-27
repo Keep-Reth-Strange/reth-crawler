@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use aws_config::meta::region::RegionProviderChain;
 use aws_sdk_dynamodb::types::AttributeValue;
 use aws_sdk_dynamodb::{config::Region, Client};
-use tokio_rusqlite::Connection;
+use tokio_rusqlite::{params, Connection};
 use tokio_stream::StreamExt;
 
 /// The abstraction trait over the database.
@@ -67,7 +67,12 @@ impl PeerDB for AwsPeerDB {
             .collect();
         let peer_id = AttributeValue::S(peer_data.id);
         let peer_ip = AttributeValue::S(peer_data.address);
+        let client_name = AttributeValue::S(peer_data.client_name);
         let client_version = AttributeValue::S(peer_data.client_version);
+        let client_build = AttributeValue::S(peer_data.client_build);
+        let client_arch = AttributeValue::S(peer_data.client_arch);
+        let os: AttributeValue = AttributeValue::S(peer_data.os);
+        let client_language = AttributeValue::S(peer_data.client_language);
         let enode_url = AttributeValue::S(peer_data.enode_url);
         let port = AttributeValue::N(peer_data.tcp_port.to_string()); // numbers are sent over the network as string
         let chain = AttributeValue::S(peer_data.chain);
@@ -93,7 +98,12 @@ impl PeerDB for AwsPeerDB {
             .table_name("eth-peer-data")
             .item("peer-id", peer_id)
             .item("peer-ip", peer_ip)
+            .item("client_name", client_name)
             .item("client_version", client_version)
+            .item("client_build", client_build)
+            .item("client_arch", client_arch)
+            .item("os", os)
+            .item("client_language", client_language)
             .item("enode_url", enode_url)
             .item("port", port)
             .item("chain", chain)
@@ -278,7 +288,12 @@ impl SqlPeerDB {
                     "CREATE TABLE IF NOT EXISTS eth_peer_data (
                 id TEXT PRIMARY KEY,
                 ip TEXT NOT NULL,
+                client_name TEXT NON NULL,
                 client_version TEXT NOT NULL,
+                client_build TEXT,
+                client_arch TEXT,
+                os TEXT,
+                client_language TEXT,
                 enode_url TEXT NOT NULL,
                 port INTEGER NOT NULL,
                 chain TEXT NOT NULL,
@@ -295,6 +310,7 @@ impl SqlPeerDB {
             );",
                     [],
                 )
+                .map_err(|err| err.into())
             })
             .await
             .unwrap();
@@ -308,11 +324,16 @@ impl PeerDB for SqlPeerDB {
         self.db
             .call(move |conn| {
                 conn.execute(
-                    "INSERT OR REPLACE INTO eth_peer_data (id, ip, client_version, enode_url, port, chain, genesis_hash, best_block, total_difficulty, country, city, last_seen, capabilities, eth_version, synced, isp) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
-                    (
+                    "INSERT OR REPLACE INTO eth_peer_data (id, ip, client_name, client_version, client_build, client_arch, os, client_language, enode_url, port, chain, genesis_hash, best_block, total_difficulty, country, city, last_seen, capabilities, eth_version, synced, isp) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)",
+                    params!(
                         &peer_data.id,
                         &peer_data.address,
+                        &peer_data.client_name,
                         &peer_data.client_version,
+                        &peer_data.client_build,
+                        &peer_data.client_arch,
+                        &peer_data.os,
+                        &peer_data.client_language,
                         &peer_data.enode_url,
                         &peer_data.tcp_port,
                         &peer_data.chain,
@@ -327,7 +348,7 @@ impl PeerDB for SqlPeerDB {
                         &peer_data.synced,
                         &peer_data.isp,
                     ),
-                )
+                ).map_err(|err| err.into())
             })
             .await
             .map_err(AddItemError::SqlAddItemError)?;
@@ -343,25 +364,30 @@ impl PeerDB for SqlPeerDB {
                     Ok(PeerData {
                         id: row.get(0)?,
                         address: row.get(1)?,
-                        client_version: row.get(2)?,
-                        enode_url: row.get(3)?,
-                        tcp_port: row.get(4)?,
-                        chain: row.get(5)?,
-                        genesis_block_hash: row.get(6)?,
-                        best_block: row.get(7)?,
-                        total_difficulty: row.get(8)?,
-                        country: row.get(9)?,
-                        city: row.get(10)?,
-                        last_seen: row.get(11)?,
+                        client_name: row.get(2)?,
+                        client_version: row.get(3)?,
+                        client_build: row.get(4)?,
+                        client_arch: row.get(5)?,
+                        os: row.get(6)?,
+                        client_language: row.get(7)?,
+                        enode_url: row.get(8)?,
+                        tcp_port: row.get(9)?,
+                        chain: row.get(10)?,
+                        genesis_block_hash: row.get(11)?,
+                        best_block: row.get(12)?,
+                        total_difficulty: row.get(13)?,
+                        country: row.get(14)?,
+                        city: row.get(15)?,
+                        last_seen: row.get(16)?,
                         capabilities: row
-                            .get::<_, String>(12)?
+                            .get::<_, String>(17)?
                             .as_str()
                             .split(',')
                             .map(|s| s.to_string())
                             .collect(),
-                        eth_version: row.get(13)?,
-                        synced: row.get(14)?,
-                        isp: row.get(15)?,
+                        eth_version: row.get(18)?,
+                        synced: row.get(19)?,
+                        isp: row.get(20)?,
                     })
                 })?;
                 let mut peers = vec![];
@@ -389,25 +415,30 @@ impl PeerDB for SqlPeerDB {
                     Ok(PeerData {
                         id: row.get(0)?,
                         address: row.get(1)?,
-                        client_version: row.get(2)?,
-                        enode_url: row.get(3)?,
-                        tcp_port: row.get(4)?,
-                        chain: row.get(5)?,
-                        genesis_block_hash: row.get(6)?,
-                        best_block: row.get(7)?,
-                        total_difficulty: row.get(8)?,
-                        country: row.get(9)?,
-                        city: row.get(10)?,
-                        last_seen: row.get(11)?,
+                        client_name: row.get(2)?,
+                        client_version: row.get(3)?,
+                        client_build: row.get(4)?,
+                        client_arch: row.get(5)?,
+                        os: row.get(6)?,
+                        client_language: row.get(7)?,
+                        enode_url: row.get(8)?,
+                        tcp_port: row.get(9)?,
+                        chain: row.get(10)?,
+                        genesis_block_hash: row.get(11)?,
+                        best_block: row.get(12)?,
+                        total_difficulty: row.get(13)?,
+                        country: row.get(14)?,
+                        city: row.get(15)?,
+                        last_seen: row.get(16)?,
                         capabilities: row
-                            .get::<_, String>(12)?
+                            .get::<_, String>(17)?
                             .as_str()
                             .split(',')
                             .map(|s| s.to_string())
                             .collect(),
-                        eth_version: row.get(13)?,
-                        synced: row.get(14)?,
-                        isp: row.get(15)?,
+                        eth_version: row.get(18)?,
+                        synced: row.get(19)?,
+                        isp: row.get(20)?,
                     })
                 })?;
                 let mut peers = vec![];
@@ -431,25 +462,30 @@ impl PeerDB for SqlPeerDB {
                     Ok(PeerData {
                         id: row.get(0)?,
                         address: row.get(1)?,
-                        client_version: row.get(2)?,
-                        enode_url: row.get(3)?,
-                        tcp_port: row.get(4)?,
-                        chain: row.get(5)?,
-                        genesis_block_hash: row.get(6)?,
-                        best_block: row.get(7)?,
-                        total_difficulty: row.get(8)?,
-                        country: row.get(9)?,
-                        city: row.get(10)?,
-                        last_seen: row.get(11)?,
+                        client_name: row.get(2)?,
+                        client_version: row.get(3)?,
+                        client_build: row.get(4)?,
+                        client_arch: row.get(5)?,
+                        os: row.get(6)?,
+                        client_language: row.get(7)?,
+                        enode_url: row.get(8)?,
+                        tcp_port: row.get(9)?,
+                        chain: row.get(10)?,
+                        genesis_block_hash: row.get(11)?,
+                        best_block: row.get(12)?,
+                        total_difficulty: row.get(13)?,
+                        country: row.get(14)?,
+                        city: row.get(15)?,
+                        last_seen: row.get(16)?,
                         capabilities: row
-                            .get::<_, String>(12)?
+                            .get::<_, String>(17)?
                             .as_str()
                             .split(',')
                             .map(|s| s.to_string())
                             .collect(),
-                        eth_version: row.get(13)?,
-                        synced: row.get(14)?,
-                        isp: row.get(15)?,
+                        eth_version: row.get(18)?,
+                        synced: row.get(19)?,
+                        isp: row.get(20)?,
                     })
                 })?;
                 let mut peers = vec![];
@@ -473,25 +509,30 @@ impl PeerDB for SqlPeerDB {
                     Ok(PeerData {
                         id: row.get(0)?,
                         address: row.get(1)?,
-                        client_version: row.get(2)?,
-                        enode_url: row.get(3)?,
-                        tcp_port: row.get(4)?,
-                        chain: row.get(5)?,
-                        genesis_block_hash: row.get(6)?,
-                        best_block: row.get(7)?,
-                        total_difficulty: row.get(8)?,
-                        country: row.get(9)?,
-                        city: row.get(10)?,
-                        last_seen: row.get(11)?,
+                        client_name: row.get(2)?,
+                        client_version: row.get(3)?,
+                        client_build: row.get(4)?,
+                        client_arch: row.get(5)?,
+                        os: row.get(6)?,
+                        client_language: row.get(7)?,
+                        enode_url: row.get(8)?,
+                        tcp_port: row.get(9)?,
+                        chain: row.get(10)?,
+                        genesis_block_hash: row.get(11)?,
+                        best_block: row.get(12)?,
+                        total_difficulty: row.get(13)?,
+                        country: row.get(14)?,
+                        city: row.get(15)?,
+                        last_seen: row.get(16)?,
                         capabilities: row
-                            .get::<_, String>(12)?
+                            .get::<_, String>(17)?
                             .as_str()
                             .split(',')
                             .map(|s| s.to_string())
                             .collect(),
-                        eth_version: row.get(13)?,
-                        synced: row.get(14)?,
-                        isp: row.get(15)?,
+                        eth_version: row.get(18)?,
+                        synced: row.get(19)?,
+                        isp: row.get(20)?,
                     })
                 })?;
                 let mut peers = vec![];
@@ -515,25 +556,30 @@ impl PeerDB for SqlPeerDB {
                     Ok(PeerData {
                         id: row.get(0)?,
                         address: row.get(1)?,
-                        client_version: row.get(2)?,
-                        enode_url: row.get(3)?,
-                        tcp_port: row.get(4)?,
-                        chain: row.get(5)?,
-                        genesis_block_hash: row.get(6)?,
-                        best_block: row.get(7)?,
-                        total_difficulty: row.get(8)?,
-                        country: row.get(9)?,
-                        city: row.get(10)?,
-                        last_seen: row.get(11)?,
+                        client_name: row.get(2)?,
+                        client_version: row.get(3)?,
+                        client_build: row.get(4)?,
+                        client_arch: row.get(5)?,
+                        os: row.get(6)?,
+                        client_language: row.get(7)?,
+                        enode_url: row.get(8)?,
+                        tcp_port: row.get(9)?,
+                        chain: row.get(10)?,
+                        genesis_block_hash: row.get(11)?,
+                        best_block: row.get(12)?,
+                        total_difficulty: row.get(13)?,
+                        country: row.get(14)?,
+                        city: row.get(15)?,
+                        last_seen: row.get(16)?,
                         capabilities: row
-                            .get::<_, String>(12)?
+                            .get::<_, String>(17)?
                             .as_str()
                             .split(',')
                             .map(|s| s.to_string())
                             .collect(),
-                        eth_version: row.get(13)?,
-                        synced: row.get(14)?,
-                        isp: row.get(15)?,
+                        eth_version: row.get(18)?,
+                        synced: row.get(19)?,
+                        isp: row.get(20)?,
                     })
                 })?;
                 let mut clients = vec![];
@@ -564,25 +610,30 @@ impl PeerDB for SqlPeerDB {
                     Ok(PeerData {
                         id: row.get(0)?,
                         address: row.get(1)?,
-                        client_version: row.get(2)?,
-                        enode_url: row.get(3)?,
-                        tcp_port: row.get(4)?,
-                        chain: row.get(5)?,
-                        genesis_block_hash: row.get(6)?,
-                        best_block: row.get(7)?,
-                        total_difficulty: row.get(8)?,
-                        country: row.get(9)?,
-                        city: row.get(10)?,
-                        last_seen: row.get(11)?,
+                        client_name: row.get(2)?,
+                        client_version: row.get(3)?,
+                        client_build: row.get(4)?,
+                        client_arch: row.get(5)?,
+                        os: row.get(6)?,
+                        client_language: row.get(7)?,
+                        enode_url: row.get(8)?,
+                        tcp_port: row.get(9)?,
+                        chain: row.get(10)?,
+                        genesis_block_hash: row.get(11)?,
+                        best_block: row.get(12)?,
+                        total_difficulty: row.get(13)?,
+                        country: row.get(14)?,
+                        city: row.get(15)?,
+                        last_seen: row.get(16)?,
                         capabilities: row
-                            .get::<_, String>(12)?
+                            .get::<_, String>(17)?
                             .as_str()
                             .split(',')
                             .map(|s| s.to_string())
                             .collect(),
-                        eth_version: row.get(13)?,
-                        synced: row.get(14)?,
-                        isp: row.get(15)?,
+                        eth_version: row.get(18)?,
+                        synced: row.get(19)?,
+                        isp: row.get(20)?,
                     })
                 })?;
                 let mut clients = vec![];

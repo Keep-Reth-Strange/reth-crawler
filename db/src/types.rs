@@ -21,8 +21,18 @@ pub struct PeerData {
     pub address: String,
     /// Tcp port.
     pub tcp_port: u16,
+    /// Client name.
+    pub client_name: String,
     /// Client version.
     pub client_version: String,
+    /// Client build.
+    pub client_build: String,
+    /// CPU architecture.
+    pub client_arch: String,
+    /// Operating system.
+    pub os: String,
+    /// Code language used for the client.
+    pub client_language: String,
     /// Eth wire protocol version.
     pub eth_version: u8,
     /// Capabilities of the node.
@@ -55,7 +65,12 @@ impl PeerData {
         id: String,
         address: String,
         tcp_port: u16,
+        client_name: String,
         client_version: String,
+        client_build: String,
+        client_arch: String,
+        os: String,
+        client_language: String,
         capabilities: Vec<String>,
         last_seen: String,
         country: String,
@@ -73,7 +88,12 @@ impl PeerData {
             id,
             address,
             tcp_port,
+            client_name,
             client_version,
+            client_build,
+            client_arch,
+            os,
+            client_language,
             capabilities,
             last_seen,
             country,
@@ -96,7 +116,12 @@ impl From<&HashMap<String, AttributeValue>> for PeerData {
             as_string(value.get("peer-id"), &"".to_string()),
             as_string(value.get("peer-ip"), &"".to_string()),
             as_u16(value.get("port"), 30303),
+            as_string(value.get("client_name"), &"".to_string()),
             as_string(value.get("client_version"), &"".to_string()),
+            as_string(value.get("client_build"), &"".to_string()),
+            as_string(value.get("client_architecture"), &"".to_string()),
+            as_string(value.get("os"), &"".to_string()),
+            as_string(value.get("client_language"), &"".to_string()),
             as_string_vec(value.get("capabilities")),
             as_string(value.get("last_seen"), &"".to_string()),
             as_string(value.get("country"), &"".to_string()),
