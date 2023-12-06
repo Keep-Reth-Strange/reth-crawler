@@ -23,6 +23,7 @@ install:
 
 # Run the crawler with a string argument for the ws RPC
 run:
+	ulimit -n 25000
 	source "$HOME/.cargo/env"
 	cargo build --release -p reth-crawler
 	cd target/release
