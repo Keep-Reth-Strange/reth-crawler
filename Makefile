@@ -6,7 +6,6 @@ install:
 	
 	# install Rust
 	curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-	export PATH="$HOME/.cargo/bin:$PATH"
 
 	# install dependencies
 	sudo apt install build-essential -y
@@ -18,12 +17,13 @@ install:
 
 	# install aws cli
 	curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-	sudo apt install unzip -y
+	sudo apt install unzip
 	unzip awscliv2.zip
 	sudo ./aws/install
 
 # Run the crawler with a string argument for the ws RPC
 run:
+	source "$HOME/.cargo/env"
 	cargo build --release -p reth-crawler
 	cd target/release
-	./reth-crawler crawl --eth-rpc-url $(ARG)
+	RUST_LOG=INFO ./reth-crawler crawl --eth-rpc-url $(ARG)
