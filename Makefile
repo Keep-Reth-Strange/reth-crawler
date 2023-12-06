@@ -3,10 +3,6 @@ install:
 	# update all packets	
 	sudo apt update -y
 	sudo apt upgrade -y
-
-	# get the repo from github
-	sudo apt install git
-	git clone https://github.com/Keep-Reth-Strange/reth-crawler
 	
 	# install Rust
 	curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
