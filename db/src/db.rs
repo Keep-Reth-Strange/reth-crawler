@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use aws_config::meta::region::RegionProviderChain;
 use aws_sdk_dynamodb::types::AttributeValue;
 use aws_sdk_dynamodb::{config::Region, Client};
-use tokio_postgres::{Client as PostgresClient, Connection as PostgresConnection, NoTls};
+use tokio_postgres::{Client as PostgresClient, NoTls};
 use tokio_rusqlite::{params, Connection};
 use tokio_stream::StreamExt;
 
