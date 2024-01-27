@@ -38,10 +38,12 @@ struct CrawlOpts {
     #[arg(long)]
     /// Use a sqlite db for local testing.
     local_db: bool,
-
     /// Eth RPC url to use for getting full blocks and determining whether or not a node is synced. It **MUST** be a web socket url.
     #[arg(long, default_value = "wss://localhost:8546")]
     eth_rpc_url: String,
+    /// Number of crawler nodes to spawn
+    #[arg(short, long, default_value_t = 5)]
+    n_nodes: u16,
 }
 
 #[tokio::main]
@@ -58,9 +60,9 @@ async fn main() {
                 CrawlerBuilder::default().without_local_db()
             };
 
-            let (_, _, _, _) = builder
+            let _ = builder
                 .with_eth_rpc_url(opts.eth_rpc_url.clone())
-                .build()
+                .build(opts.n_nodes)
                 .await
                 .run()
                 .await;

@@ -1,11 +1,11 @@
 use crate::crawler::BlockHashNumHandle;
 use crate::p2p::{handshake_eth, handshake_p2p};
 use chrono::Utc;
-use ethers::providers::{Middleware, Provider, Ws};
 use ethers::types::H256;
 use futures::StreamExt;
 use ipgeolocate::{Locator, Service};
-use reth_crawler_db::{save_peer, AwsPeerDB, PeerDB, PeerData, SqlPeerDB};
+use reth_crawler_db::db::PostgreSQLPeerDb;
+use reth_crawler_db::{save_peer, PeerDB, PeerData, SqlPeerDB};
 use reth_discv4::{DiscoveryUpdate, Discv4};
 use reth_dns_discovery::{DnsDiscoveryHandle, DnsNodeRecordUpdate};
 use reth_ecies::stream::ECIESStream;
@@ -29,7 +29,6 @@ const SLEEP_TIME: u64 = 30;
 /// - discovery
 /// - dns discovery
 /// - network
-/// - state
 pub(crate) struct UpdateListener {
     /// Discovery protocol handle.
     discv4: Discv4,
@@ -45,8 +44,6 @@ pub(crate) struct UpdateListener {
     db: Arc<dyn PeerDB>,
     /// Mapping between peer and number of p2p failures.
     p2p_failures: Arc<RwLock<HashMap<PeerId, u64>>>,
-    /// Inner provider to use for block requests.
-    provider: Provider<Ws>,
 }
 
 impl UpdateListener {
@@ -58,7 +55,6 @@ impl UpdateListener {
         state_handle: BlockHashNumHandle,
         key: SecretKey,
         local_db: bool,
-        provider: Provider<Ws>,
     ) -> Self {
         let p2p_failures = Arc::from(RwLock::from(HashMap::new()));
         if local_db {
@@ -69,7 +65,6 @@ impl UpdateListener {
                 db: Arc::new(SqlPeerDB::new().await),
                 network,
                 p2p_failures,
-                provider,
                 state_handle,
             }
         } else {
@@ -77,10 +72,9 @@ impl UpdateListener {
                 discv4,
                 dnsdisc,
                 key,
-                db: Arc::new(AwsPeerDB::new().await),
+                db: Arc::new(PostgreSQLPeerDb::new().await),
                 network,
                 p2p_failures,
-                provider,
                 state_handle,
             }
         }
@@ -139,7 +133,7 @@ impl UpdateListener {
     }
 
     /// Start network for handling incoming connections.
-    pub(crate) async fn start_network(&self) {
+    pub(crate) async fn start_network(&self) -> eyre::Result<()> {
         time::sleep(Duration::from_secs(SLEEP_TIME)).await;
         let mut net_events = self.network.event_listener();
         info!("network is starting...");
@@ -239,20 +233,6 @@ impl UpdateListener {
                 }
             }
         }
-    }
-
-    /// Start state to update it (LRU) with new blocks.
-    pub(crate) async fn block_subscription_manager(&self) -> eyre::Result<()> {
-        let mut block_subscription = self.provider.subscribe_blocks().await?;
-
-        while let Some(block) = block_subscription.next().await {
-            let block_hash = block.hash.expect("it's not a pending block");
-            let block_number = block.number.expect("it's not a pending block");
-            self.state_handle
-                .new_block(block_hash, block_number)
-                .await?;
-        }
-
         Ok(())
     }
 }

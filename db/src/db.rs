@@ -662,7 +662,12 @@ pub struct PostgreSQLPeerDb {
 impl PostgreSQLPeerDb {
     /// Create a new PostgreSQL db or connect to an already existing one.
     pub async fn new() -> Self {
-        let (client, connection) = tokio_postgres::connect("config", NoTls).await.unwrap();
+        let (client, connection) = tokio_postgres::connect(
+            "postgresql://postgres:aleNov16A??_@localhost/eth_peer_data",
+            NoTls,
+        )
+        .await
+        .unwrap();
 
         // The connection object performs the actual communication with the database,
         // so spawn it off to run on its own.
@@ -681,7 +686,29 @@ impl PeerDB for PostgreSQLPeerDb {
     async fn add_peer(&self, peer_data: PeerData) -> Result<(), AddItemError> {
         self.db
             .execute(
-                    "INSERT OR REPLACE INTO eth_peer_data (id, ip, client_name, client_version, client_build, client_arch, os, client_language, enode_url, port, chain, genesis_hash, best_block, total_difficulty, country, city, last_seen, capabilities, eth_version, synced, isp) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)",
+                "INSERT INTO eth_peer_data (id, ip, client_name, client_version, client_build, client_arch, os, client_language, enode_url, port, chain, genesis_hash, best_block, total_difficulty, country, city, last_seen, capabilities, eth_version, synced, isp) 
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+                ON CONFLICT (id) DO UPDATE 
+                SET ip = EXCLUDED.ip, 
+                    client_name = EXCLUDED.client_name, 
+                    client_version = EXCLUDED.client_version, 
+                    client_build = EXCLUDED.client_build, 
+                    client_arch = EXCLUDED.client_arch, 
+                    os = EXCLUDED.os, 
+                    client_language = EXCLUDED.client_language, 
+                    enode_url = EXCLUDED.enode_url, 
+                    port = EXCLUDED.port, 
+                    chain = EXCLUDED.chain, 
+                    genesis_hash = EXCLUDED.genesis_hash, 
+                    best_block = EXCLUDED.best_block, 
+                    total_difficulty = EXCLUDED.total_difficulty, 
+                    country = EXCLUDED.country, 
+                    city = EXCLUDED.city, 
+                    last_seen = EXCLUDED.last_seen, 
+                    capabilities = EXCLUDED.capabilities, 
+                    eth_version = EXCLUDED.eth_version, 
+                    synced = EXCLUDED.synced, 
+                    isp = EXCLUDED.isp",
                     &[
                         &peer_data.id,
                         &peer_data.address,
@@ -692,7 +719,7 @@ impl PeerDB for PostgreSQLPeerDb {
                         &peer_data.os,
                         &peer_data.client_language,
                         &peer_data.enode_url,
-                        &(peer_data.tcp_port as i16),
+                        &(peer_data.tcp_port as i32),
                         &peer_data.chain,
                         &peer_data.genesis_block_hash,
                         &peer_data.best_block,
@@ -701,7 +728,7 @@ impl PeerDB for PostgreSQLPeerDb {
                         &peer_data.city,
                         &peer_data.last_seen,
                         &peer_data.capabilities.join(","),
-                        &(peer_data.eth_version as i8),
+                        &(peer_data.eth_version as i32),
                         &peer_data.synced,
                         &peer_data.isp
                     ]
@@ -726,7 +753,7 @@ impl PeerDB for PostgreSQLPeerDb {
                 os: row.get(6),
                 client_language: row.get(7),
                 enode_url: row.get(8),
-                tcp_port: row.get::<_, i16>(9) as u16,
+                tcp_port: row.get::<_, u32>(9) as u16,
                 chain: row.get(10),
                 genesis_block_hash: row.get(11),
                 best_block: row.get(12),
@@ -740,7 +767,7 @@ impl PeerDB for PostgreSQLPeerDb {
                     .split(',')
                     .map(|s| s.to_string())
                     .collect(),
-                eth_version: row.get::<_, i8>(18) as u8,
+                eth_version: row.get::<_, u32>(18) as u8,
                 synced: row.get(19),
                 isp: row.get(20),
             })
@@ -770,7 +797,7 @@ impl PeerDB for PostgreSQLPeerDb {
                 os: row.get(6),
                 client_language: row.get(7),
                 enode_url: row.get(8),
-                tcp_port: row.get::<_, i16>(9) as u16,
+                tcp_port: row.get::<_, u32>(9) as u16,
                 chain: row.get(10),
                 genesis_block_hash: row.get(11),
                 best_block: row.get(12),
@@ -784,7 +811,7 @@ impl PeerDB for PostgreSQLPeerDb {
                     .split(',')
                     .map(|s| s.to_string())
                     .collect(),
-                eth_version: row.get::<_, i8>(18) as u8,
+                eth_version: row.get::<_, u32>(18) as u8,
                 synced: row.get(19),
                 isp: row.get(20),
             })
@@ -810,7 +837,7 @@ impl PeerDB for PostgreSQLPeerDb {
                 os: row.get(6),
                 client_language: row.get(7),
                 enode_url: row.get(8),
-                tcp_port: row.get::<_, i16>(9) as u16,
+                tcp_port: row.get::<_, u32>(9) as u16,
                 chain: row.get(10),
                 genesis_block_hash: row.get(11),
                 best_block: row.get(12),
@@ -824,7 +851,7 @@ impl PeerDB for PostgreSQLPeerDb {
                     .split(',')
                     .map(|s| s.to_string())
                     .collect(),
-                eth_version: row.get::<_, i8>(18) as u8,
+                eth_version: row.get::<_, u32>(18) as u8,
                 synced: row.get(19),
                 isp: row.get(20),
             })
@@ -850,7 +877,7 @@ impl PeerDB for PostgreSQLPeerDb {
                 os: row.get(6),
                 client_language: row.get(7),
                 enode_url: row.get(8),
-                tcp_port: row.get::<_, i16>(9) as u16,
+                tcp_port: row.get::<_, u32>(9) as u16,
                 chain: row.get(10),
                 genesis_block_hash: row.get(11),
                 best_block: row.get(12),
@@ -864,7 +891,7 @@ impl PeerDB for PostgreSQLPeerDb {
                     .split(',')
                     .map(|s| s.to_string())
                     .collect(),
-                eth_version: row.get::<_, i8>(18) as u8,
+                eth_version: row.get::<_, u32>(18) as u8,
                 synced: row.get(19),
                 isp: row.get(20),
             })

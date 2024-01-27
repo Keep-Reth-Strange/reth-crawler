@@ -1,5 +1,5 @@
 use chrono::{Duration, Utc};
-use reth_crawler_db::{AwsPeerDB, PeerDB, SqlPeerDB};
+use reth_crawler_db::{db::PostgreSQLPeerDb, PeerDB, SqlPeerDB};
 use std::error::Error;
 
 const PAGE_SIZE: Option<i32> = None;
@@ -7,7 +7,7 @@ const PAGE_SIZE: Option<i32> = None;
 /// Updates the SQLite db used for APIs requests from the AWS db used for the crawler.
 async fn db_sync(update_time: i64, first_sync: bool) -> Result<(), Box<dyn Error>> {
     // dynamoDB setup
-    let dynamo_db = AwsPeerDB::new().await;
+    let dynamo_db = PostgreSQLPeerDb::new().await;
     // sqliteDB setup
     let sqlite_db = SqlPeerDB::new().await;
 
