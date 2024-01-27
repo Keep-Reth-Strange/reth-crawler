@@ -51,3 +51,6 @@ aws-sdk-dynamodb = { version = "0.33.0" }
 
 # sqlite
 tokio-rusqlite = "0.5.0"
+
+# postgresql
+tokio-postgres = "0.7.10"

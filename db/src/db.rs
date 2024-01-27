@@ -5,6 +5,7 @@ use async_trait::async_trait;
 use aws_config::meta::region::RegionProviderChain;
 use aws_sdk_dynamodb::types::AttributeValue;
 use aws_sdk_dynamodb::{config::Region, Client};
+use tokio_postgres::{Client as PostgresClient, NoTls};
 use tokio_rusqlite::{params, Connection};
 use tokio_stream::StreamExt;
 
@@ -647,6 +648,261 @@ impl PeerDB for SqlPeerDB {
             })
             .await
             .map_err(ScanTableError::SqlScanError)?;
+
+        Ok(clients)
+    }
+}
+
+/// PostgreSQL db.
+#[derive(Debug)]
+pub struct PostgreSQLPeerDb {
+    db: PostgresClient,
+}
+
+impl PostgreSQLPeerDb {
+    /// Create a new PostgreSQL db or connect to an already existing one.
+    pub async fn new() -> Self {
+        let (client, connection) = tokio_postgres::connect("config", NoTls).await.unwrap();
+
+        // The connection object performs the actual communication with the database,
+        // so spawn it off to run on its own.
+        tokio::spawn(async move {
+            if let Err(e) = connection.await {
+                eprintln!("Connection error: {}", e);
+            }
+        });
+
+        Self { db: client }
+    }
+}
+
+#[async_trait]
+impl PeerDB for PostgreSQLPeerDb {
+    async fn add_peer(&self, peer_data: PeerData) -> Result<(), AddItemError> {
+        self.db
+            .execute(
+                    "INSERT OR REPLACE INTO eth_peer_data (id, ip, client_name, client_version, client_build, client_arch, os, client_language, enode_url, port, chain, genesis_hash, best_block, total_difficulty, country, city, last_seen, capabilities, eth_version, synced, isp) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)",
+                    &[
+                        &peer_data.id,
+                        &peer_data.address,
+                        &peer_data.client_name,
+                        &peer_data.client_version,
+                        &peer_data.client_build,
+                        &peer_data.client_arch,
+                        &peer_data.os,
+                        &peer_data.client_language,
+                        &peer_data.enode_url,
+                        &(peer_data.tcp_port as i16),
+                        &peer_data.chain,
+                        &peer_data.genesis_block_hash,
+                        &peer_data.best_block,
+                        &peer_data.total_difficulty,
+                        &peer_data.country,
+                        &peer_data.city,
+                        &peer_data.last_seen,
+                        &peer_data.capabilities.join(","),
+                        &(peer_data.eth_version as i8),
+                        &peer_data.synced,
+                        &peer_data.isp
+                    ]
+                ).await?;
+        Ok(())
+    }
+
+    async fn all_peers(&self, _page_size: Option<i32>) -> Result<Vec<PeerData>, ScanTableError> {
+        let stmt = "SELECT * from eth_peer_data";
+
+        let rows = self.db.query(stmt, &[]).await?;
+
+        let peers: Vec<PeerData> = rows
+            .into_iter()
+            .map(|row| PeerData {
+                id: row.get(0),
+                address: row.get(1),
+                client_name: row.get(2),
+                client_version: row.get(3),
+                client_build: row.get(4),
+                client_arch: row.get(5),
+                os: row.get(6),
+                client_language: row.get(7),
+                enode_url: row.get(8),
+                tcp_port: row.get::<_, i16>(9) as u16,
+                chain: row.get(10),
+                genesis_block_hash: row.get(11),
+                best_block: row.get(12),
+                total_difficulty: row.get(13),
+                country: row.get(14),
+                city: row.get(15),
+                last_seen: row.get(16),
+                capabilities: row
+                    .get::<_, String>(17)
+                    .as_str()
+                    .split(',')
+                    .map(|s| s.to_string())
+                    .collect(),
+                eth_version: row.get::<_, i8>(18) as u8,
+                synced: row.get(19),
+                isp: row.get(20),
+            })
+            .collect();
+
+        Ok(peers)
+    }
+
+    async fn all_active_peers(
+        &self,
+        last_seen: String,
+        _page_size: Option<i32>,
+    ) -> Result<Vec<PeerData>, ScanTableError> {
+        let stmt = "SELECT * from eth_peer_data WHERE last_seen > ?1";
+
+        let rows = self.db.query(stmt, &[&last_seen]).await?;
+
+        let peers: Vec<PeerData> = rows
+            .into_iter()
+            .map(|row| PeerData {
+                id: row.get(0),
+                address: row.get(1),
+                client_name: row.get(2),
+                client_version: row.get(3),
+                client_build: row.get(4),
+                client_arch: row.get(5),
+                os: row.get(6),
+                client_language: row.get(7),
+                enode_url: row.get(8),
+                tcp_port: row.get::<_, i16>(9) as u16,
+                chain: row.get(10),
+                genesis_block_hash: row.get(11),
+                best_block: row.get(12),
+                total_difficulty: row.get(13),
+                country: row.get(14),
+                city: row.get(15),
+                last_seen: row.get(16),
+                capabilities: row
+                    .get::<_, String>(17)
+                    .as_str()
+                    .split(',')
+                    .map(|s| s.to_string())
+                    .collect(),
+                eth_version: row.get::<_, i8>(18) as u8,
+                synced: row.get(19),
+                isp: row.get(20),
+            })
+            .collect();
+
+        Ok(peers)
+    }
+
+    async fn node_by_id(&self, id: String) -> Result<Option<Vec<PeerData>>, QueryItemError> {
+        let stmt = "SELECT * from eth_peer_data WHERE id = ?1";
+
+        let rows = self.db.query(stmt, &[&id]).await?;
+
+        let peers: Vec<PeerData> = rows
+            .into_iter()
+            .map(|row| PeerData {
+                id: row.get(0),
+                address: row.get(1),
+                client_name: row.get(2),
+                client_version: row.get(3),
+                client_build: row.get(4),
+                client_arch: row.get(5),
+                os: row.get(6),
+                client_language: row.get(7),
+                enode_url: row.get(8),
+                tcp_port: row.get::<_, i16>(9) as u16,
+                chain: row.get(10),
+                genesis_block_hash: row.get(11),
+                best_block: row.get(12),
+                total_difficulty: row.get(13),
+                country: row.get(14),
+                city: row.get(15),
+                last_seen: row.get(16),
+                capabilities: row
+                    .get::<_, String>(17)
+                    .as_str()
+                    .split(',')
+                    .map(|s| s.to_string())
+                    .collect(),
+                eth_version: row.get::<_, i8>(18) as u8,
+                synced: row.get(19),
+                isp: row.get(20),
+            })
+            .collect();
+
+        Ok(Some(peers))
+    }
+
+    async fn node_by_ip(&self, ip: String) -> Result<Option<Vec<PeerData>>, QueryItemError> {
+        let stmt = "SELECT * from eth_peer_data WHERE ip = ?1";
+
+        let rows = self.db.query(stmt, &[&ip]).await?;
+
+        let peers: Vec<PeerData> = rows
+            .into_iter()
+            .map(|row| PeerData {
+                id: row.get(0),
+                address: row.get(1),
+                client_name: row.get(2),
+                client_version: row.get(3),
+                client_build: row.get(4),
+                client_arch: row.get(5),
+                os: row.get(6),
+                client_language: row.get(7),
+                enode_url: row.get(8),
+                tcp_port: row.get::<_, i16>(9) as u16,
+                chain: row.get(10),
+                genesis_block_hash: row.get(11),
+                best_block: row.get(12),
+                total_difficulty: row.get(13),
+                country: row.get(14),
+                city: row.get(15),
+                last_seen: row.get(16),
+                capabilities: row
+                    .get::<_, String>(17)
+                    .as_str()
+                    .split(',')
+                    .map(|s| s.to_string())
+                    .collect(),
+                eth_version: row.get::<_, i8>(18) as u8,
+                synced: row.get(19),
+                isp: row.get(20),
+            })
+            .collect();
+
+        Ok(Some(peers))
+    }
+
+    async fn clients(&self, _page_size: Option<i32>) -> Result<Vec<ClientData>, ScanTableError> {
+        let stmt = "SELECT client_name from eth_peer_data";
+
+        let rows = self.db.query(stmt, &[]).await?;
+
+        let clients: Vec<ClientData> = rows
+            .into_iter()
+            .map(|row| ClientData {
+                client_version: row.get(0),
+            })
+            .collect();
+
+        Ok(clients)
+    }
+
+    async fn active_clients(
+        &self,
+        last_seen: String,
+        _page_size: Option<i32>,
+    ) -> Result<Vec<ClientData>, ScanTableError> {
+        let stmt = "SELECT client_name from eth_peer_data WHERE last_seen > ?1";
+
+        let rows = self.db.query(stmt, &[&last_seen]).await?;
+
+        let clients: Vec<ClientData> = rows
+            .into_iter()
+            .map(|row| ClientData {
+                client_version: row.get(0),
+            })
+            .collect();
 
         Ok(clients)
     }
