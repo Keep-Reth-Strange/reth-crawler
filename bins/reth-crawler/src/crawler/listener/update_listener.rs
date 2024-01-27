@@ -29,7 +29,6 @@ const SLEEP_TIME: u64 = 30;
 /// - discovery
 /// - dns discovery
 /// - network
-/// - state
 pub(crate) struct UpdateListener {
     /// Discovery protocol handle.
     discv4: Discv4,
@@ -139,7 +138,7 @@ impl UpdateListener {
     }
 
     /// Start network for handling incoming connections.
-    pub(crate) async fn start_network(&self) {
+    pub(crate) async fn start_network(&self) -> eyre::Result<()> {
         time::sleep(Duration::from_secs(SLEEP_TIME)).await;
         let mut net_events = self.network.event_listener();
         info!("network is starting...");
@@ -239,20 +238,6 @@ impl UpdateListener {
                 }
             }
         }
-    }
-
-    /// Start state to update it (LRU) with new blocks.
-    pub(crate) async fn block_subscription_manager(&self) -> eyre::Result<()> {
-        let mut block_subscription = self.provider.subscribe_blocks().await?;
-
-        while let Some(block) = block_subscription.next().await {
-            let block_hash = block.hash.expect("it's not a pending block");
-            let block_number = block.number.expect("it's not a pending block");
-            self.state_handle
-                .new_block(block_hash, block_number)
-                .await?;
-        }
-
         Ok(())
     }
 }

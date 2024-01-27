@@ -1,3 +1,5 @@
+mod state_listener;
 mod update_listener;
 
-pub(crate) use self::update_listener::UpdateListener;
+// Re-exports.
+pub(crate) use self::{state_listener::StateListener, update_listener::UpdateListener};
