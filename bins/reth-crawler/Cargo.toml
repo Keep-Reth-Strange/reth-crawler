@@ -30,7 +30,7 @@ tokio-stream.workspace = true
 tracing-subscriber.workspace = true
 console-subscriber.workspace = true
 tracing.workspace = true
-ipgeolocate = { git = "https://github.com/0xprames/ipgeolocate.git", branch = "main" }
+ipgeolocate.workspace = true
 eyre.workspace = true
 futures.workspace = true
 chrono.workspace = true
