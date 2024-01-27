@@ -62,7 +62,7 @@ impl CrawlerBuilder {
     }
 
     /// Build the [`CrawlerService`]
-    pub(crate) async fn build(self) -> CrawlerService {
+    pub(crate) async fn build(self, n_nodes: u16) -> CrawlerService {
         // Ensure the rpc url is set
         let provider_url = self.eth_rpc_url.expect("eth rpc url must be provided");
         // Create the connection with the provider
@@ -76,7 +76,7 @@ impl CrawlerBuilder {
         let mut all_key = vec![];
 
         // create 2 crawlers
-        for i in 0..2 {
+        for i in 0..n_nodes {
             // Setup configs related to this 'node' by creating a new random
             let key = rng_secret_key();
             let mut enr = NodeRecord::from_secret_key(DEFAULT_DISCOVERY_ADDRESS, &key);
