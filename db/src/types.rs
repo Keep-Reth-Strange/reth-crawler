@@ -208,6 +208,9 @@ pub enum AddItemError {
     /// Error related to SQLite db.
     #[error("An error occurred adding a new item into the SQL database: {0}")]
     SqlAddItemError(#[from] tokio_rusqlite::Error),
+    /// Error related to Postgres db.
+    #[error("An error occurred adding a new item into the Postgres database: {0}")]
+    PostgresAddItemError(#[from] tokio_postgres::Error),
 }
 
 /// Error for the `all_peers` operation.
@@ -222,6 +225,9 @@ pub enum ScanTableError {
     /// Error related to SQLite db.
     #[error("An error occurred while performing a scan of the SQL database: {0}")]
     SqlScanError(#[from] tokio_rusqlite::Error),
+    /// Error related to Postgres db.
+    #[error("An error occurred while performing a scan of the Postgres database: {0}")]
+    PostgresScanError(#[from] tokio_postgres::Error),
 }
 
 /// Error for the `node_by_id` or `node_by_ip` operations.
@@ -236,6 +242,9 @@ pub enum QueryItemError {
     /// Error related to SQLite db.
     #[error("An error occurred querying the SQL database: {0}")]
     SqlQueryItemError(#[from] tokio_rusqlite::Error),
+    /// Error related to Postgres db.
+    #[error("An error occurred querying the Postgres database:: {0}")]
+    PostgresQueryItemError(#[from] tokio_postgres::Error),
 }
 
 /// We don't use this...
@@ -245,6 +254,9 @@ pub enum DeleteItemError {
     /// Error related to SQLite db.
     #[error("An error occurred deleting a new item into the SQL database: {0}")]
     SqlDeleteItemError(#[from] tokio_rusqlite::Error),
+    /// Error related to Postgres db.
+    #[error("An error occurred deleting a new item into the Postgres database: {0}")]
+    PostgresDeleteItemError(#[from] tokio_postgres::Error),
 }
 
 /// Represents a client.

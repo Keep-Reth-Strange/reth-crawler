@@ -26,3 +26,6 @@ serde.workspace = true
 
 # sqlite
 tokio-rusqlite.workspace = true
+
+# postgresql
+tokio-postgres.workspace = true
