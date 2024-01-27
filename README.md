@@ -54,6 +54,13 @@ For local testing there is a flag to save peers in a `peers_data.db` file (sqlit
 ./reth-crawler crawl --local-db
 ```
 
+### Node endpoint
+
+Note that the crawl command assumes that a local node is running at `wss://localhost:8546`. If that is not the case, you will need to pass a node websocket url as argument, for eg.
+```
+./reth-crawler crawl --local-db --eth-rpc-url wss://ethereum.publicnode.com
+```
+
 ## The API server
 
 The API server is not necessary for crawling the network but it's very useful to serve the crawled data.
