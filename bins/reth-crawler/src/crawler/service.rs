@@ -1,11 +1,11 @@
 use super::{block_hash_num::BlockHashNumHandle, listener::StateListener};
 use crate::crawler::listener::UpdateListener;
 use ethers::providers::{Provider, Ws};
-use futures::join;
 use reth_discv4::Discv4;
 use reth_dns_discovery::DnsDiscoveryHandle;
 use reth_network::NetworkHandle;
 use secp256k1::SecretKey;
+use tokio::join;
 use tracing::info;
 
 /// Service that creates the `UpdateListener` and runs the crawler.
@@ -41,7 +41,6 @@ impl CrawlerService {
                 state_handle.clone(),
                 key[i],
                 local_db,
-                provider.clone(),
             )
             .await;
             updates.push(update);
@@ -68,28 +67,17 @@ impl CrawlerService {
             network_futures.push(update.start_network());
         }
 
-        // Join all futures to run them concurrently.
-        // This will wait for all discv4 services to start.
-        let discv4_results = futures::future::join_all(discv4_futures).await;
-        handle_service_results(discv4_results)?;
-
-        // Similarly, for dnsdisc...
-        let dnsdisc_results = futures::future::join_all(dnsdisc_futures).await;
-        handle_service_results(dnsdisc_results)?;
-
-        // ...and network services.
-        let network_results = futures::future::join_all(network_futures).await;
-        handle_service_results(network_results)?;
-
         // Start the block subscription manager.
-        self.state.block_subscription_manager().await
-    }
-}
+        let state_future = self.state.block_subscription_manager();
 
-// Helper function to handle the results of service starts.
-fn handle_service_results(results: Vec<eyre::Result<()>>) -> eyre::Result<()> {
-    for result in results {
-        result?; // This will propagate the error if any of the service starts failed.
+        // Use `join!` to run all futures concurrently
+        let _ = join!(
+            futures::future::join_all(discv4_futures),
+            futures::future::join_all(dnsdisc_futures),
+            futures::future::join_all(network_futures),
+            state_future
+        );
+
+        Ok(())
     }
-    Ok(())
 }

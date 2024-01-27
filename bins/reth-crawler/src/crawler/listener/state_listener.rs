@@ -3,7 +3,7 @@ use ethers::providers::{Middleware, Provider, Ws};
 use futures::StreamExt;
 
 /// Listener that starts state service in order to keep updating it (LRU) with new blocks.
-pub struct StateListener {
+pub(crate) struct StateListener {
     /// State handle for `BlockUpdate` and `HashRequest` requests.
     state_handle: BlockHashNumHandle,
     /// Inner provider to use for block requests.
@@ -12,7 +12,7 @@ pub struct StateListener {
 
 impl StateListener {
     /// Create a new `StateListener`.
-    pub fn new(state_handle: BlockHashNumHandle, provider: Provider<Ws>) -> Self {
+    pub(crate) fn new(state_handle: BlockHashNumHandle, provider: Provider<Ws>) -> Self {
         Self {
             state_handle,
             provider,
