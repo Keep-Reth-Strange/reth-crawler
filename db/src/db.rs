@@ -764,7 +764,7 @@ impl PeerDB for PostgreSQLPeerDb {
                 os: row.get(6),
                 client_language: row.get(7),
                 enode_url: row.get(8),
-                tcp_port: row.get::<_, u32>(9) as u16,
+                tcp_port: row.get::<_, i32>(9) as u16,
                 chain: row.get(10),
                 genesis_block_hash: row.get(11),
                 best_block: row.get(12),
@@ -778,7 +778,7 @@ impl PeerDB for PostgreSQLPeerDb {
                     .split(',')
                     .map(|s| s.to_string())
                     .collect(),
-                eth_version: row.get::<_, u32>(18) as u8,
+                eth_version: row.get::<_, i32>(18) as u8,
                 synced: row.get(19),
                 isp: row.get(20),
             })
@@ -808,7 +808,7 @@ impl PeerDB for PostgreSQLPeerDb {
                 os: row.get(6),
                 client_language: row.get(7),
                 enode_url: row.get(8),
-                tcp_port: row.get::<_, u32>(9) as u16,
+                tcp_port: row.get::<_, i32>(9) as u16,
                 chain: row.get(10),
                 genesis_block_hash: row.get(11),
                 best_block: row.get(12),
@@ -822,7 +822,7 @@ impl PeerDB for PostgreSQLPeerDb {
                     .split(',')
                     .map(|s| s.to_string())
                     .collect(),
-                eth_version: row.get::<_, u32>(18) as u8,
+                eth_version: row.get::<_, i32>(18) as u8,
                 synced: row.get(19),
                 isp: row.get(20),
             })
@@ -848,7 +848,7 @@ impl PeerDB for PostgreSQLPeerDb {
                 os: row.get(6),
                 client_language: row.get(7),
                 enode_url: row.get(8),
-                tcp_port: row.get::<_, u32>(9) as u16,
+                tcp_port: row.get::<_, i32>(9) as u16,
                 chain: row.get(10),
                 genesis_block_hash: row.get(11),
                 best_block: row.get(12),
@@ -862,7 +862,7 @@ impl PeerDB for PostgreSQLPeerDb {
                     .split(',')
                     .map(|s| s.to_string())
                     .collect(),
-                eth_version: row.get::<_, u32>(18) as u8,
+                eth_version: row.get::<_, i32>(18) as u8,
                 synced: row.get(19),
                 isp: row.get(20),
             })
@@ -888,7 +888,7 @@ impl PeerDB for PostgreSQLPeerDb {
                 os: row.get(6),
                 client_language: row.get(7),
                 enode_url: row.get(8),
-                tcp_port: row.get::<_, u32>(9) as u16,
+                tcp_port: row.get::<_, i32>(9) as u16,
                 chain: row.get(10),
                 genesis_block_hash: row.get(11),
                 best_block: row.get(12),
@@ -902,7 +902,7 @@ impl PeerDB for PostgreSQLPeerDb {
                     .split(',')
                     .map(|s| s.to_string())
                     .collect(),
-                eth_version: row.get::<_, u32>(18) as u8,
+                eth_version: row.get::<_, i32>(18) as u8,
                 synced: row.get(19),
                 isp: row.get(20),
             })
