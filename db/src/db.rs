@@ -662,8 +662,18 @@ pub struct PostgreSQLPeerDb {
 impl PostgreSQLPeerDb {
     /// Create a new PostgreSQL db or connect to an already existing one.
     pub async fn new() -> Self {
+        let postgres_username = std::env::var("POSTGRES_USERNAME")
+            .expect("you should have `POSTGRES_USERNAME` env variable for postgres db");
+        let postgres_pass = std::env::var("POSTGRES_PASS")
+            .expect("you should have `POSTGRES_PASS` env variable for postgres db");
+        let ip_addr = std::env::var("IP_ADDR")
+            .expect("you should have `IP_ADDR` env variable for postgres db");
+        let table_name = "eth_peer_data";
         let (client, connection) = tokio_postgres::connect(
-            "postgresql://postgres:aleNov16A??_@localhost/eth_peer_data",
+            &format!(
+                "postgresql://{}:{}@{}/{}",
+                postgres_username, postgres_pass, ip_addr, table_name
+            ),
             NoTls,
         )
         .await
