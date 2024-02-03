@@ -668,11 +668,12 @@ impl PostgreSQLPeerDb {
             .expect("you should have `POSTGRES_PASS` env variable for postgres db");
         let ip_addr = std::env::var("IP_ADDR")
             .expect("you should have `IP_ADDR` env variable for postgres db");
-        let table_name = "eth_peer_data";
+        let db_name = std::env::var("DB_NAME")
+            .expect("you should have `DB_NAME` env variable for postgres db");
         let (client, connection) = tokio_postgres::connect(
             &format!(
                 "postgresql://{}:{}@{}/{}",
-                postgres_username, postgres_pass, ip_addr, table_name
+                postgres_username, postgres_pass, ip_addr, db_name
             ),
             NoTls,
         )
